@@ -12,7 +12,7 @@ def execute():
     client = NSEHttpClient()
     
     # Get today's date in DDMMYYYY format
-    today = datetime.datetime.now
+    today = datetime.datetime.now()
     date_str = today.strftime("%d%m%Y")
     
     file_name = f"sec_bhavdata_full_{date_str}.csv"
