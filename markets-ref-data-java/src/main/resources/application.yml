@@ -1,0 +1,32 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: markets-ref-data-java
+
+nse:
+  base-url: https://www.nseindia.com
+  archive-url: https://nsearchives.nseindia.com/products/content/
+  data-dir: ./data
+  headers:
+    "[User-Agent]": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"
+    "[Accept]": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8"
+    "[Accept-Language]": "en-US,en;q=0.9"
+  scheduler:
+    enabled: true
+    # Weekdays at 19:00 IST - after NSE typically publishes the day's Bhavcopy.
+    # zone is pinned explicitly so this fires at 19:00 IST regardless of the
+    # container/host's own timezone (e.g. a UTC container clock).
+    cron: "0 0 19 * * MON-FRI"
+    zone: "Asia/Kolkata"
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %-5level - %logger{36} - %msg%n"

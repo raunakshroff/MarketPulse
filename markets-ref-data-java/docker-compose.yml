@@ -1,0 +1,15 @@
+services:
+  markets-ref-data-java:
+    build: .
+    image: markets-ref-data-java:latest
+    container_name: markets-ref-data-java
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    volumes:
+      - bhavcopy-data:/app/data
+    environment:
+      TZ: Asia/Kolkata
+
+volumes:
+  bhavcopy-data:

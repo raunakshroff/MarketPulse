@@ -4,61 +4,64 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-MarketPulse is a multi-module project for enterprise/professional-level markets data tracking and analysis. It currently hosts one module, `markets-ref-data`, which handles external data extraction and reference data management (fetching daily NSE Bhavcopy EOD price files). Future modules are expected to live as sibling directories alongside `markets-ref-data`.
+MarketPulse is a multi-module project for enterprise/professional-level markets data tracking and analysis. It currently hosts one module, `markets-ref-data-java`, a Spring Boot microservice that handles external data extraction and reference data management (fetching daily NSE Bhavcopy EOD price files, filtered to equities). Future modules are expected to live as sibling directories alongside `markets-ref-data-java`.
+
+`markets-ref-data-java` began as a Python module (`markets-ref-data`) and was rewritten in Java/Spring Boot to run as a long-lived, continuously-deployed service rather than a script invoked by an external scheduler.
 
 ## Commands
 
-All commands below are run from the `markets-ref-data/` directory.
+All commands below are run from the `markets-ref-data-java/` directory. Requires JDK 21 and Maven.
 
 ```powershell
-cd markets-ref-data
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Run the downloader job manually
-python run_bhavcopy_job.py
+cd markets-ref-data-java
 
 # Run the full test suite
-pytest tests/
+mvn test
 
-# Run a single test file
-pytest tests/test_http_client.py
+# Run a single test class
+mvn test -Dtest=BhavcopyServiceTest
 
-# Run a single test
-pytest tests/test_http_client.py::test_download_file_success
+# Run a single test method
+mvn test -Dtest=BhavcopyServiceTest#treats404AsNotFoundRatherThanFailure
+
+# Run the app locally in the foreground
+mvn spring-boot:run
+
+# Build a runnable jar
+mvn package
+java -jar target/markets-ref-data-java-0.1.0-SNAPSHOT.jar
+
+# Build and run continuously via Docker (recommended - see "Deployment" below)
+docker compose up -d --build
 ```
 
-Note: `pytest` is not currently installed in the active Python environment (only `requests` is present) — run `pip install -r requirements.txt` before testing.
-
-There is no linter, formatter, or CI config in this repo yet.
+There is no linter/formatter config in this repo yet.
 
 ## Architecture
 
-### Import root and path setup
+### Package layout (`com.marketpulse.refdata`)
 
-Code under `src/` uses absolute imports rooted at `markets-ref-data/` (e.g. `from src.config import ...`, `from src.utils.logger import setup_logger`). Both the entry point and the test suite manually add `markets-ref-data/` to `sys.path` rather than relying on a package install:
-- [run_bhavcopy_job.py](markets-ref-data/run_bhavcopy_job.py) appends its own directory to `sys.path` before importing `src.*`.
-- [tests/conftest.py](markets-ref-data/tests/conftest.py) does the same (appends the parent of `tests/`, i.e. `markets-ref-data/`).
+1. **[config/NseProperties.java](markets-ref-data-java/src/main/java/com/marketpulse/refdata/config/NseProperties.java)** — `@ConfigurationProperties(prefix = "nse")`: base/archive URLs, `data-dir`, the browser-like `headers` map, and nested `scheduler.{enabled,cron,zone}`. Backed by [application.yml](markets-ref-data-java/src/main/resources/application.yml) — note header keys use YAML bracket syntax (`"[User-Agent]"`) so hyphenated names bind literally.
+2. **[config/HttpClientConfig.java](markets-ref-data-java/src/main/java/com/marketpulse/refdata/config/HttpClientConfig.java)** — provides the shared `java.net.http.HttpClient` bean (named `httpClient`, deliberately distinct from the `NseHttpClient` component to avoid a Spring bean-name collision) with an in-memory `CookieManager`.
+3. **[client/NseHttpClient.java](markets-ref-data-java/src/main/java/com/marketpulse/refdata/client/NseHttpClient.java)** — mirrors the old Python `NSEHttpClient`: on construction it `GET`s `nse.base-url` to establish session cookies (NSE requires this before archive downloads succeed), then exposes `downloadFile(url)`. A 4xx/5xx response raises `NseHttpException` carrying the status code.
+4. **[service/EquityCsvFilter.java](markets-ref-data-java/src/main/java/com/marketpulse/refdata/service/EquityCsvFilter.java)** — parses the raw Bhavcopy CSV (Apache Commons CSV) and keeps only rows where `SERIES == "EQ"`.
+5. **[service/BhavcopyService.java](markets-ref-data-java/src/main/java/com/marketpulse/refdata/service/BhavcopyService.java)** — orchestrates download → filter → write to `nse.data-dir` as `sec_bhavdata_full_DDMMYYYY.csv`, and reads records back for the API. A 404 from `NseHttpClient` is treated as an expected "holiday or not yet published" case (`DownloadResult.Status.NOT_FOUND`), not a failure.
+6. **[controller/BhavcopyController.java](markets-ref-data-java/src/main/java/com/marketpulse/refdata/controller/BhavcopyController.java)** — REST API: `POST /api/v1/bhavcopy/download?date=...` (triggers a download; omitted `date` defaults to today, or to the preceding Friday via the package-private `lastWeekday()` helper if today is a Saturday/Sunday) and `GET /api/v1/bhavcopy/{date}` (returns saved equity rows as JSON, 404 if not yet downloaded).
+7. **[scheduler/BhavcopyScheduler.java](markets-ref-data-java/src/main/java/com/marketpulse/refdata/scheduler/BhavcopyScheduler.java)** — `@Scheduled(cron = "${nse.scheduler.cron}", zone = "${nse.scheduler.zone}")`, replacing the old Python cron/Task Scheduler entry point. **The `zone` is pinned explicitly to `Asia/Kolkata`** — without it, a containerized JVM defaults to UTC and "19:00" would fire at the wrong wall-clock time. Disable via `nse.scheduler.enabled=false`.
 
-There is no `setup.py`/`pyproject.toml` — the module is not pip-installed, so always run scripts/tests from within `markets-ref-data/` so this path logic resolves correctly.
+### Deployment: why this must run continuously
 
-### Data flow (`markets-ref-data`)
-
-1. **[src/config.py](markets-ref-data/src/config.py)** — central config: `BASE_DIR`/`DATA_DIR` paths, NSE base/archive URLs, and the browser-like `DEFAULT_HEADERS` (User-Agent/Accept/Accept-Language) required to avoid NSE's anti-scraping blocks.
-2. **[src/utils/http_client.py](markets-ref-data/src/utils/http_client.py)** — `NSEHttpClient` wraps a `requests.Session`. On construction it first `GET`s `NSE_BASE_URL` to establish cookies/session state (NSE requires this before archive downloads succeed), then exposes `download_file(url)` which does a `GET` + `raise_for_status()` and returns raw bytes.
-3. **[src/jobs/bhavcopy_downloader.py](markets-ref-data/src/jobs/bhavcopy_downloader.py)** — `execute()` is the job entry point: builds today's Bhavcopy filename (`sec_bhavdata_full_DDMMYYYY.csv`), downloads it via `NSEHttpClient`, writes it to `DATA_DIR`, and logs outcomes. A `404` is treated as an expected "holiday or not yet published" case (logged as a warning, not an error) rather than a failure.
-4. **[src/utils/logger.py](markets-ref-data/src/utils/logger.py)** — `setup_logger(name)` returns a standard `logging.Logger` with a single `StreamHandler`; it guards against adding duplicate handlers if called more than once with the same name.
-5. **[run_bhavcopy_job.py](markets-ref-data/run_bhavcopy_job.py)** — the script invoked by cron/Windows Task Scheduler; just calls `execute()` with logging around it.
+Unlike the old Python script (invoked once daily by an external OS scheduler and then exiting), `BhavcopyScheduler`'s trigger lives *inside* the JVM process — the app must stay running 24/7 for the daily 19:00 IST job to fire at all. This is what [Dockerfile](markets-ref-data-java/Dockerfile) + [docker-compose.yml](markets-ref-data-java/docker-compose.yml) are for: `restart: unless-stopped` keeps the container alive across crashes/reboots (as long as Docker Desktop/daemon itself is running), and the `bhavcopy-data` named volume persists downloaded CSVs across container recreation. `TZ=Asia/Kolkata` is also set at the container level as a second layer on top of the explicit Spring `zone`.
 
 ### Testing conventions
 
-Tests fully mock network and filesystem calls (no live HTTP requests to NSE, no real file I/O) using `unittest.mock.patch`:
-- `requests.Session.get` is patched directly to control both the session-init call and subsequent download calls (see [tests/test_http_client.py](markets-ref-data/tests/test_http_client.py) — note the session-init `GET` happens in `NSEHttpClient.__init__`, so tests that check `download_file` in isolation call `mock_get.reset_mock()` after construction).
-- `datetime`, `open`, and `os.makedirs` are patched in [tests/test_bhavcopy_downloader.py](markets-ref-data/tests/test_bhavcopy_downloader.py) to assert the exact filename/path derived from a fixed date, without touching disk.
+JUnit 5 + Mockito + AssertJ; controller tests use `@WebMvcTest` + `MockMvc` + `@MockBean`. No live HTTP calls or real NSE data are used:
+- **[client/NseHttpClientTest.java](markets-ref-data-java/src/test/java/com/marketpulse/refdata/client/NseHttpClientTest.java)** mocks `java.net.http.HttpClient` directly (it's injected, not constructed internally, specifically so this is mockable) and distinguishes the session-init call from the download call by inspecting the request URI in `thenAnswer`, since matching on `BodyHandlers.discarding()`/`ofByteArray()` by equality doesn't work (fresh lambda instances each call).
+- **[service/BhavcopyServiceTest.java](markets-ref-data-java/src/test/java/com/marketpulse/refdata/service/BhavcopyServiceTest.java)** mocks `NseHttpClient` and uses `@TempDir` for `nse.data-dir` to assert real file writes without touching the repo.
+- **[controller/BhavcopyControllerTest.java](markets-ref-data-java/src/test/java/com/marketpulse/refdata/controller/BhavcopyControllerTest.java)** covers the REST layer via `MockMvc`, plus direct unit tests of the package-private `BhavcopyController.lastWeekday()` static helper (Saturday/Sunday roll back to Friday, weekdays unchanged) rather than trying to mock `LocalDate.now()`.
 
-### Known operational constraints (from README research notes)
+### Known operational constraints (carried over from the original Python research)
 
 - NSE aggressively blocks scraping; requests without proper headers return `401`/`403`.
-- A session must be established by visiting `nseindia.com` first to obtain valid cookies before hitting archive file URLs directly — this is why `NSEHttpClient` performs a warm-up `GET` in its constructor.
-- Realistic browser `User-Agent`/`Accept`/`Accept-Language` headers (see `DEFAULT_HEADERS` in `config.py`) are required to bypass these restrictions.
+- A session must be established by visiting `nseindia.com` first to obtain valid cookies before hitting archive file URLs directly — this is why `NseHttpClient` performs a warm-up `GET` in its constructor.
+- Realistic browser `User-Agent`/`Accept`/`Accept-Language` headers (see `nse.headers` in `application.yml`) are required to bypass these restrictions.

@@ -23,3 +23,11 @@ ENV/
 
 # Fetched market data output
 markets-ref-data/data/
+markets-ref-data-java/data/
+
+# Java / Maven
+target/
+*.class
+
+# App modernization tool session artifacts (unrelated to this project)
+.github/modernize/
