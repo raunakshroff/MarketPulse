@@ -56,6 +56,7 @@ public class NseProperties {
     public static class Scheduler {
         private boolean enabled = true;
         private String cron;
+        private String zone = "Asia/Kolkata";
 
         public boolean isEnabled() {
             return enabled;
@@ -71,6 +72,14 @@ public class NseProperties {
 
         public void setCron(String cron) {
             this.cron = cron;
+        }
+
+        public String getZone() {
+            return zone;
+        }
+
+        public void setZone(String zone) {
+            this.zone = zone;
         }
     }
 }

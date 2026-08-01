@@ -15,8 +15,11 @@ nse:
     "[Accept-Language]": "en-US,en;q=0.9"
   scheduler:
     enabled: true
-    # Weekdays at 19:00 - after NSE typically publishes the day's Bhavcopy
+    # Weekdays at 19:00 IST - after NSE typically publishes the day's Bhavcopy.
+    # zone is pinned explicitly so this fires at 19:00 IST regardless of the
+    # container/host's own timezone (e.g. a UTC container clock).
     cron: "0 0 19 * * MON-FRI"
+    zone: "Asia/Kolkata"
 
 management:
   endpoints:

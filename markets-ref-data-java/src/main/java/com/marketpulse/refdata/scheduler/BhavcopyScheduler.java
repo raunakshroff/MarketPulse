@@ -21,7 +21,7 @@ public class BhavcopyScheduler {
         this.bhavcopyService = bhavcopyService;
     }
 
-    @Scheduled(cron = "${nse.scheduler.cron}")
+    @Scheduled(cron = "${nse.scheduler.cron}", zone = "${nse.scheduler.zone}")
     public void runDailyDownload() {
         log.info("Triggering scheduled Bhavcopy download job...");
         bhavcopyService.downloadBhavcopy(LocalDate.now());
