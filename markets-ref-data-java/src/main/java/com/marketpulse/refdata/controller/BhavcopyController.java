@@ -26,15 +26,24 @@ public class BhavcopyController {
         this.bhavcopyService = bhavcopyService;
     }
 
-    /** Triggers a download for the given date (defaults to today) and returns the outcome. */
+    /** Triggers a download for the given date (defaults to today, or the last weekday if today is a weekend). */
     @PostMapping("/download")
     public ResponseEntity<DownloadResult> download(@RequestParam(required = false) LocalDate date) {
-        LocalDate targetDate = date != null ? date : LocalDate.now();
+        LocalDate targetDate = date != null ? date : lastWeekday(LocalDate.now());
         DownloadResult result = bhavcopyService.downloadBhavcopy(targetDate);
         return switch (result.status()) {
             case SUCCESS -> ResponseEntity.ok(result);
             case NOT_FOUND -> ResponseEntity.status(HttpStatus.NOT_FOUND).body(result);
             case FAILURE -> ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(result);
+        };
+    }
+
+    /** Rolls a Saturday/Sunday back to the preceding Friday; any other day is returned unchanged. */
+    static LocalDate lastWeekday(LocalDate date) {
+        return switch (date.getDayOfWeek()) {
+            case SATURDAY -> date.minusDays(1);
+            case SUNDAY -> date.minusDays(2);
+            default -> date;
         };
     }
 

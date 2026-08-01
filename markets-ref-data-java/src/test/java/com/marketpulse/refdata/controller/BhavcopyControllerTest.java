@@ -1,5 +1,6 @@
 package com.marketpulse.refdata.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -53,5 +54,23 @@ class BhavcopyControllerTest {
 
         mockMvc.perform(get("/api/v1/bhavcopy/2026-08-01"))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void lastWeekdayRollsSaturdayBackToFriday() {
+        LocalDate saturday = LocalDate.of(2026, 8, 1);
+        assertThat(BhavcopyController.lastWeekday(saturday)).isEqualTo(LocalDate.of(2026, 7, 31));
+    }
+
+    @Test
+    void lastWeekdayRollsSundayBackToFriday() {
+        LocalDate sunday = LocalDate.of(2026, 8, 2);
+        assertThat(BhavcopyController.lastWeekday(sunday)).isEqualTo(LocalDate.of(2026, 7, 31));
+    }
+
+    @Test
+    void lastWeekdayLeavesWeekdaysUnchanged() {
+        LocalDate wednesday = LocalDate.of(2026, 7, 29);
+        assertThat(BhavcopyController.lastWeekday(wednesday)).isEqualTo(wednesday);
     }
 }
