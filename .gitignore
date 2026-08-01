@@ -23,7 +23,6 @@ ENV/
 
 # Fetched market data output
 markets-ref-data/data/
-markets-ref-data-java/data/
 
 # Java / Maven
 target/

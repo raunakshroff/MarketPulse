@@ -12,9 +12,9 @@
     </parent>
 
     <groupId>com.marketpulse</groupId>
-    <artifactId>markets-ref-data-java</artifactId>
+    <artifactId>markets-ref-data</artifactId>
     <version>0.1.0-SNAPSHOT</version>
-    <name>markets-ref-data-java</name>
+    <name>markets-ref-data</name>
     <description>MarketPulse reference data microservice - NSE Bhavcopy (equity) ingestion</description>
 
     <properties>

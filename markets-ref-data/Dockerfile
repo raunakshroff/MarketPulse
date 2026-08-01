@@ -14,7 +14,7 @@ FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 
 RUN addgroup -S app && adduser -S app -G app
-COPY --from=build /build/target/markets-ref-data-java-*.jar app.jar
+COPY --from=build /build/target/markets-ref-data-*.jar app.jar
 RUN mkdir -p /app/data && chown -R app:app /app
 USER app
 

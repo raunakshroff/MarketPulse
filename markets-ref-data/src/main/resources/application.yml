@@ -3,7 +3,7 @@ server:
 
 spring:
   application:
-    name: markets-ref-data-java
+    name: markets-ref-data
 
 nse:
   base-url: https://www.nseindia.com
