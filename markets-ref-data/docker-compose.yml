@@ -1,8 +1,8 @@
 services:
-  markets-ref-data-java:
+  markets-ref-data:
     build: .
-    image: markets-ref-data-java:latest
-    container_name: markets-ref-data-java
+    image: markets-ref-data:latest
+    container_name: markets-ref-data
     restart: unless-stopped
     ports:
       - "8081:8081"

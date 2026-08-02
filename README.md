@@ -3,9 +3,9 @@ Enterprise & Professional Level Markets Data Tracking and Analysis
 
 ## Project Structure
 MarketPulse is a multi-module project.
-Currently, it hosts the `markets-ref-data-java` module, which handles external data extraction and reference data management as a standalone microservice.
+Currently, it hosts the `markets-ref-data` module, which handles external data extraction and reference data management as a standalone microservice.
 
-### Module: `markets-ref-data-java`
+### Module: `markets-ref-data`
 This module is responsible for systematically fetching market reference data, such as the daily NSE Bhavcopy files, and serving it over a REST API.
 
 **Key Features:**
@@ -18,7 +18,7 @@ This module is responsible for systematically fetching market reference data, su
 
 #### Directory Layout
 ```text
-markets-ref-data-java/
+markets-ref-data/
 ├── src/main/java/com/marketpulse/refdata/
 │   ├── RefDataApplication.java     # Spring Boot entry point
 │   ├── client/                     # NseHttpClient (cookie session), NseHttpException
@@ -38,7 +38,7 @@ markets-ref-data-java/
 1. **Prerequisites:** JDK 21 and Maven.
 2. **Run the test suite:**
    ```powershell
-   cd markets-ref-data-java
+   cd markets-ref-data
    mvn test
    ```
 3. **Run locally (foreground):**
@@ -47,7 +47,7 @@ markets-ref-data-java/
    ```
 4. **Run continuously via Docker (recommended):**
    ```powershell
-   cd markets-ref-data-java
+   cd markets-ref-data
    docker compose up -d --build
    ```
    This keeps the service running (and restarting on crash/reboot) so the 19:00 IST weekday scheduler actually fires. Downloaded CSVs persist in the `bhavcopy-data` Docker volume, mounted at `/app/data`.
