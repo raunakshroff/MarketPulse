@@ -2,7 +2,7 @@ package com.marketpulse.refdata.model;
 
 import java.time.LocalDate;
 
-public record DownloadResult(LocalDate date, Status status, String filePath, long rowCount, String message) {
+public record DownloadResult(LocalDate date, Status status, String location, long rowCount, String message) {
 
     public enum Status {
         SUCCESS,
@@ -10,8 +10,8 @@ public record DownloadResult(LocalDate date, Status status, String filePath, lon
         FAILURE
     }
 
-    public static DownloadResult success(LocalDate date, String filePath, long rowCount) {
-        return new DownloadResult(date, Status.SUCCESS, filePath, rowCount, null);
+    public static DownloadResult success(LocalDate date, String location, long rowCount) {
+        return new DownloadResult(date, Status.SUCCESS, location, rowCount, null);
     }
 
     public static DownloadResult notFound(LocalDate date) {

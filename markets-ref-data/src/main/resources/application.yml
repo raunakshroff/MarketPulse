@@ -4,11 +4,26 @@ server:
 spring:
   application:
     name: markets-ref-data
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/marketpulse}
+    username: ${SPRING_DATASOURCE_USERNAME:marketpulse}
+    password: ${SPRING_DATASOURCE_PASSWORD:marketpulse}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          batch_size: 500
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
 
 nse:
   base-url: https://www.nseindia.com
   archive-url: https://nsearchives.nseindia.com/products/content/
-  data-dir: ./data
   headers:
     "[User-Agent]": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"
     "[Accept]": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8"

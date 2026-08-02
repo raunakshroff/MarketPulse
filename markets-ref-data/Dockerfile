@@ -15,10 +15,9 @@ WORKDIR /app
 
 RUN addgroup -S app && adduser -S app -G app
 COPY --from=build /build/target/markets-ref-data-*.jar app.jar
-RUN mkdir -p /app/data && chown -R app:app /app
+RUN chown -R app:app /app
 USER app
 
-ENV NSE_DATA_DIR=/app/data
 EXPOSE 8081
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \

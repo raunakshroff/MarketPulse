@@ -10,12 +10,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.marketpulse.refdata.model.DownloadResult;
 import com.marketpulse.refdata.service.BhavcopyService;
-import java.nio.file.NoSuchFileException;
 import java.time.LocalDate;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(BhavcopyController.class)
@@ -49,11 +50,20 @@ class BhavcopyControllerTest {
     }
 
     @Test
-    void getEquitiesReturnsNotFoundWhenFileMissing() throws Exception {
-        when(bhavcopyService.getEquityRecords(any())).thenThrow(new NoSuchFileException("missing"));
+    void getEquitiesReturnsNotFoundWhenNoRowsPersisted() throws Exception {
+        when(bhavcopyService.getEquityRecords(any())).thenReturn(List.of());
 
         mockMvc.perform(get("/api/v1/bhavcopy/2026-08-01"))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void getEquitiesReturnsInternalServerErrorOnDbFailure() throws Exception {
+        when(bhavcopyService.getEquityRecords(any()))
+                .thenThrow(new DataAccessResourceFailureException("db unavailable"));
+
+        mockMvc.perform(get("/api/v1/bhavcopy/2026-08-01"))
+                .andExpect(status().isInternalServerError());
     }
 
     @Test

@@ -3,10 +3,9 @@ package com.marketpulse.refdata.controller;
 import com.marketpulse.refdata.model.DownloadResult;
 import com.marketpulse.refdata.model.EquityRecord;
 import com.marketpulse.refdata.service.BhavcopyService;
-import java.io.IOException;
-import java.nio.file.NoSuchFileException;
 import java.time.LocalDate;
 import java.util.List;
+import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -51,10 +50,12 @@ public class BhavcopyController {
     @GetMapping("/{date}")
     public ResponseEntity<List<EquityRecord>> getEquities(@PathVariable LocalDate date) {
         try {
-            return ResponseEntity.ok(bhavcopyService.getEquityRecords(date));
-        } catch (NoSuchFileException e) {
-            return ResponseEntity.notFound().build();
-        } catch (IOException e) {
+            List<EquityRecord> records = bhavcopyService.getEquityRecords(date);
+            if (records.isEmpty()) {
+                return ResponseEntity.notFound().build();
+            }
+            return ResponseEntity.ok(records);
+        } catch (DataAccessException e) {
             return ResponseEntity.internalServerError().build();
         }
     }
