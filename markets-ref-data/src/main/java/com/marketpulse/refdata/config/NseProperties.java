@@ -9,7 +9,6 @@ public class NseProperties {
 
     private String baseUrl;
     private String archiveUrl;
-    private String dataDir;
     private Map<String, String> headers = new LinkedHashMap<>();
     private Scheduler scheduler = new Scheduler();
 
@@ -27,14 +26,6 @@ public class NseProperties {
 
     public void setArchiveUrl(String archiveUrl) {
         this.archiveUrl = archiveUrl;
-    }
-
-    public String getDataDir() {
-        return dataDir;
-    }
-
-    public void setDataDir(String dataDir) {
-        this.dataDir = dataDir;
     }
 
     public Map<String, String> getHeaders() {

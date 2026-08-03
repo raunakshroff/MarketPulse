@@ -2,22 +2,26 @@ package com.marketpulse.refdata.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.marketpulse.refdata.client.NseHttpClient;
 import com.marketpulse.refdata.client.NseHttpException;
 import com.marketpulse.refdata.config.NseProperties;
+import com.marketpulse.refdata.entity.EquityPrice;
 import com.marketpulse.refdata.model.DownloadResult;
 import com.marketpulse.refdata.model.EquityRecord;
+import com.marketpulse.refdata.repository.EquityPriceRepository;
+import com.marketpulse.refdata.repository.EquitySymbolRepository;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
+import org.mockito.ArgumentCaptor;
 
 class BhavcopyServiceTest {
 
@@ -29,23 +33,23 @@ class BhavcopyServiceTest {
             20MICRONS, EQ, 10-Jul-2026, 193.94, 196.00, 200.88, 196.00, 198.90, 198.34, 198.21, 136532, 270.62, 2842, 65515, 47.99
             """).getBytes(StandardCharsets.UTF_8);
 
-    @TempDir
-    Path tempDir;
-
     private NseHttpClient nseHttpClient;
+    private EquityPriceRepository equityPriceRepository;
+    private EquitySymbolRepository equitySymbolRepository;
     private BhavcopyService service;
 
     @BeforeEach
     void setUp() {
         nseHttpClient = mock(NseHttpClient.class);
+        equityPriceRepository = mock(EquityPriceRepository.class);
+        equitySymbolRepository = mock(EquitySymbolRepository.class);
         NseProperties properties = new NseProperties();
         properties.setArchiveUrl(ARCHIVE_URL);
-        properties.setDataDir(tempDir.toString());
-        service = new BhavcopyService(nseHttpClient, properties);
+        service = new BhavcopyService(nseHttpClient, properties, equityPriceRepository, equitySymbolRepository);
     }
 
     @Test
-    void downloadsFiltersAndSavesEquityRowsOnly() throws Exception {
+    void downloadsFiltersAndPersistsEquityRowsOnly() throws Exception {
         LocalDate date = LocalDate.of(2025, 11, 14);
         when(nseHttpClient.downloadFile(ARCHIVE_URL + "sec_bhavdata_full_14112025.csv")).thenReturn(RAW_CSV);
 
@@ -54,11 +58,14 @@ class BhavcopyServiceTest {
         assertThat(result.status()).isEqualTo(DownloadResult.Status.SUCCESS);
         assertThat(result.rowCount()).isEqualTo(1);
 
-        Path savedFile = tempDir.resolve("sec_bhavdata_full_14112025.csv");
-        assertThat(Files.exists(savedFile)).isTrue();
-        String saved = Files.readString(savedFile);
-        assertThat(saved).contains("20MICRONS,EQ,10-Jul-2026");
-        assertThat(saved).doesNotContain("1018GS2026");
+        ArgumentCaptor<List<EquityPrice>> pricesCaptor = ArgumentCaptor.forClass(List.class);
+        verify(equityPriceRepository).upsertAll(pricesCaptor.capture());
+        List<EquityPrice> savedRows = pricesCaptor.getValue();
+        assertThat(savedRows).hasSize(1);
+        assertThat(savedRows.get(0).getSymbol()).isEqualTo("20MICRONS");
+        assertThat(savedRows.get(0).getTradeDate()).isEqualTo(date);
+
+        verify(equitySymbolRepository).upsertAll(eq(List.of("20MICRONS")), eq(date));
     }
 
     @Test
@@ -72,15 +79,21 @@ class BhavcopyServiceTest {
     }
 
     @Test
-    void getEquityRecordsReadsBackSavedFile() throws Exception {
+    void getEquityRecordsMapsPersistedRowsBackToWireFormat() {
         LocalDate date = LocalDate.of(2025, 11, 14);
-        when(nseHttpClient.downloadFile(ARCHIVE_URL + "sec_bhavdata_full_14112025.csv")).thenReturn(RAW_CSV);
-        service.downloadBhavcopy(date);
+        EquityPrice entity = new EquityPrice(
+                date, "20MICRONS", "EQ",
+                new BigDecimal("193.94"), new BigDecimal("196.00"), new BigDecimal("200.88"),
+                new BigDecimal("196.00"), new BigDecimal("198.90"), new BigDecimal("198.34"),
+                new BigDecimal("198.21"), 136532L, new BigDecimal("270.62"), 2842L, 65515L,
+                new BigDecimal("47.99"));
+        when(equityPriceRepository.findByTradeDateOrderBySymbolAsc(date)).thenReturn(List.of(entity));
 
         List<EquityRecord> records = service.getEquityRecords(date);
 
         assertThat(records).hasSize(1);
         assertThat(records.get(0).symbol()).isEqualTo("20MICRONS");
         assertThat(records.get(0).series()).isEqualTo("EQ");
+        assertThat(records.get(0).date()).isEqualTo("14-Nov-2025");
     }
 }
