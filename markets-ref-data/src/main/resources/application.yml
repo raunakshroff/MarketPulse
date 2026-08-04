@@ -36,6 +36,13 @@ nse:
     cron: "0 0 19 * * MON-FRI"
     zone: "Asia/Kolkata"
 
+yahoo-finance:
+  # Anti-bot handshake: warm up a cookie, then fetch a crumb, then pass both
+  # on the actual quoteSummary request - a plain request 401s with "Invalid Crumb".
+  cookie-warmup-url: https://fc.yahoo.com
+  crumb-url: https://query1.finance.yahoo.com/v1/test/getcrumb
+  quote-summary-url: https://query1.finance.yahoo.com/v10/finance/quoteSummary
+
 management:
   endpoints:
     web:
