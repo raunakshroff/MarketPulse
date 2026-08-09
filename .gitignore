@@ -30,3 +30,6 @@ target/
 
 # App modernization tool session artifacts (unrelated to this project)
 .github/modernize/
+
+# Claude Code personal/machine-local notes (CLAUDE.md is the shared one)
+.claude.local.md
