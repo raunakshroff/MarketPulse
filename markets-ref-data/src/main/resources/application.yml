@@ -35,6 +35,13 @@ nse:
     # container/host's own timezone (e.g. a UTC container clock).
     cron: "0 0 19 * * MON-FRI"
     zone: "Asia/Kolkata"
+  backfill:
+    # Pause between per-date downloads during a bulk range pull.
+    delay-ms: 2000
+    # Abort a job after this many consecutive failures rather than burning an hour on errors.
+    max-consecutive-failures: 10
+    # NSE serves no usable sec_bhavdata_full file before this date.
+    earliest-date: 2019-10-01
 
 management:
   endpoints:
