@@ -19,6 +19,7 @@ import java.util.Set;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -79,6 +80,23 @@ public class BackfillService {
     public Optional<BackfillJob> findActiveJob() {
         return jobRepository.findFirstByStatusInOrderByCreatedAtAsc(
                 List.of(BackfillJobStatus.PENDING, BackfillJobStatus.RUNNING));
+    }
+
+    /**
+     * Async entry point. Returns immediately; the walk runs on the single backfill thread.
+     * Kept as a thin wrapper so {@code executeJob} stays synchronously testable.
+     */
+    @Async("backfillExecutor")
+    public void runJob(UUID jobId) {
+        try {
+            executeJob(jobId);
+        } catch (RuntimeException e) {
+            log.error("Backfill job {} threw unexpectedly: {}", jobId, e.getMessage(), e);
+            jobRepository.findById(jobId).ifPresent(job -> {
+                job.markFailed("Unexpected error: " + e.getMessage());
+                jobRepository.save(job);
+            });
+        }
     }
 
     /**
