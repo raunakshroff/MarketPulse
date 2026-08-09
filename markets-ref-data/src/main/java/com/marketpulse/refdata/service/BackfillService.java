@@ -97,7 +97,7 @@ public class BackfillService {
         log.info("Backfill job {} started: {}..{}", jobId, job.getFromDate(), job.getToDate());
 
         Set<LocalDate> skip = skipSet(job);
-        int maxConsecutiveFailures = properties.getBackfill().getMaxConsecutiveFailures();
+        int maxConsecutiveFailures = Math.max(1, properties.getBackfill().getMaxConsecutiveFailures());
         int consecutiveFailures = 0;
 
         for (LocalDate date : weekdaysBetween(job.getFromDate(), job.getToDate())) {
@@ -128,7 +128,14 @@ public class BackfillService {
                 return;
             }
 
-            sleepBetweenDates();
+            if (!sleepBetweenDates()) {
+                String message = "Interrupted after " + date + "; "
+                        + job.getProcessedDates() + "/" + job.getTotalDates() + " dates processed";
+                job.markInterrupted(message);
+                jobRepository.save(job);
+                log.warn("Backfill job {} {}", jobId, message);
+                return;
+            }
         }
 
         job.markCompleted();
@@ -154,15 +161,18 @@ public class BackfillService {
         jobRepository.save(job);
     }
 
-    private void sleepBetweenDates() {
+    /** Returns false if the wait was interrupted, meaning the walk must stop. */
+    private boolean sleepBetweenDates() {
         long delayMs = properties.getBackfill().getDelayMs();
         if (delayMs <= 0) {
-            return;
+            return true;
         }
         try {
             Thread.sleep(delayMs);
+            return true;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            return false;
         }
     }
 }

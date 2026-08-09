@@ -230,4 +230,45 @@ class BackfillServiceTest {
         assertThat(job.getTotalDates()).isEqualTo(2);
         verify(jobRepository).save(eq(job));
     }
+
+    @Test
+    void notFoundDoesNotResetTheCircuitBreaker() {
+        LocalDate d1 = LocalDate.of(2026, 8, 3);
+        LocalDate d2 = LocalDate.of(2026, 8, 4);
+        LocalDate d3 = LocalDate.of(2026, 8, 5);
+        LocalDate d4 = LocalDate.of(2026, 8, 6);
+        LocalDate d5 = LocalDate.of(2026, 8, 7);
+        when(bhavcopyService.downloadBhavcopy(d1)).thenReturn(DownloadResult.failure(d1, "x"));
+        when(bhavcopyService.downloadBhavcopy(d2)).thenReturn(DownloadResult.failure(d2, "x"));
+        when(bhavcopyService.downloadBhavcopy(d3)).thenReturn(DownloadResult.notFound(d3));
+        when(bhavcopyService.downloadBhavcopy(d4)).thenReturn(DownloadResult.failure(d4, "x"));
+        BackfillJob job = givenJob(d1, d5, false);
+
+        service.executeJob(job.getId());
+
+        // NOT_FOUND is neither a failure nor a reset, so d1/d2/d4 are 3 consecutive failures.
+        assertThat(job.getStatus()).isEqualTo(BackfillJobStatus.FAILED);
+        verify(bhavcopyService, never()).downloadBhavcopy(d5);
+    }
+
+    @Test
+    void stopsTheWalkWhenTheThrottleIsInterrupted() {
+        properties.getBackfill().setDelayMs(50L);
+        LocalDate first = LocalDate.of(2026, 8, 6);
+        LocalDate second = LocalDate.of(2026, 8, 7);
+        when(bhavcopyService.downloadBhavcopy(any()))
+                .thenAnswer(inv -> DownloadResult.success(inv.getArgument(0), "equity_price", 10));
+        BackfillJob job = givenJob(first, second, false);
+
+        Thread.currentThread().interrupt();
+        try {
+            service.executeJob(job.getId());
+        } finally {
+            Thread.interrupted(); // clear the flag so it cannot leak into other tests
+        }
+
+        assertThat(job.getStatus()).isEqualTo(BackfillJobStatus.INTERRUPTED);
+        verify(bhavcopyService).downloadBhavcopy(first);
+        verify(bhavcopyService, never()).downloadBhavcopy(second);
+    }
 }
