@@ -10,8 +10,10 @@ import com.marketpulse.refdata.entity.BackfillJob;
 import com.marketpulse.refdata.model.BackfillJobStatus;
 import com.marketpulse.refdata.repository.BackfillJobRepository;
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 class BackfillStartupReconcilerTest {
 
@@ -27,6 +29,11 @@ class BackfillStartupReconcilerTest {
         assertThat(orphan.getStatus()).isEqualTo(BackfillJobStatus.INTERRUPTED);
         assertThat(orphan.getMessage()).contains("restart");
         verify(jobRepository).save(orphan);
+
+        ArgumentCaptor<Collection<BackfillJobStatus>> statusCaptor = ArgumentCaptor.forClass(Collection.class);
+        verify(jobRepository).findByStatusIn(statusCaptor.capture());
+        assertThat(statusCaptor.getValue())
+                .containsExactlyInAnyOrder(BackfillJobStatus.PENDING, BackfillJobStatus.RUNNING);
     }
 
     @Test

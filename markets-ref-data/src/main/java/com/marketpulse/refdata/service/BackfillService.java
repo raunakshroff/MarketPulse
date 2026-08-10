@@ -92,10 +92,25 @@ public class BackfillService {
             executeJob(jobId);
         } catch (RuntimeException e) {
             log.error("Backfill job {} threw unexpectedly: {}", jobId, e.getMessage(), e);
+            markFailedQuietly(jobId, e);
+        }
+    }
+
+    /**
+     * Best-effort attempt to record the failure. The recovery write can itself fail - usually the
+     * same outage that killed the walk - and if that escaped, the job would stay RUNNING forever,
+     * which is the exact wedge this catch exists to prevent. A job left RUNNING is still relabelled
+     * INTERRUPTED by BackfillStartupReconciler on the next restart.
+     */
+    private void markFailedQuietly(UUID jobId, RuntimeException cause) {
+        try {
             jobRepository.findById(jobId).ifPresent(job -> {
-                job.markFailed("Unexpected error: " + e.getMessage());
+                job.markFailed("Unexpected error: " + cause.getMessage());
                 jobRepository.save(job);
             });
+        } catch (RuntimeException e) {
+            log.error("Backfill job {} could not be marked FAILED after an unexpected error; it may "
+                    + "stay RUNNING until the next restart reconciles it: {}", jobId, e.getMessage(), e);
         }
     }
 

@@ -1,6 +1,7 @@
 package com.marketpulse.refdata.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -270,5 +271,30 @@ class BackfillServiceTest {
         assertThat(job.getStatus()).isEqualTo(BackfillJobStatus.INTERRUPTED);
         verify(bhavcopyService).downloadBhavcopy(first);
         verify(bhavcopyService, never()).downloadBhavcopy(second);
+    }
+
+    @Test
+    void runJobMarksTheJobFailedWhenTheWalkThrows() {
+        BackfillJob job = givenJob(LocalDate.of(2026, 8, 6), LocalDate.of(2026, 8, 7), false);
+        when(equityPriceRepository.findDistinctTradeDatesBetween(any(), any()))
+                .thenThrow(new IllegalStateException("db down"));
+
+        service.runJob(job.getId());
+
+        assertThat(job.getStatus()).isEqualTo(BackfillJobStatus.FAILED);
+        assertThat(job.getMessage()).contains("db down");
+    }
+
+    @Test
+    void runJobSwallowsAFailureInItsOwnRecoveryPath() {
+        BackfillJob job = givenJob(LocalDate.of(2026, 8, 6), LocalDate.of(2026, 8, 7), false);
+        when(equityPriceRepository.findDistinctTradeDatesBetween(any(), any()))
+                .thenThrow(new IllegalStateException("db down"));
+        // First lookup succeeds (inside executeJob); the recovery lookup then fails too.
+        when(jobRepository.findById(job.getId()))
+                .thenReturn(Optional.of(job))
+                .thenThrow(new IllegalStateException("db still down"));
+
+        assertThatCode(() -> service.runJob(job.getId())).doesNotThrowAnyException();
     }
 }
