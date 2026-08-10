@@ -4,6 +4,7 @@ import com.marketpulse.refdata.config.NseProperties;
 import com.marketpulse.refdata.entity.BackfillJob;
 import com.marketpulse.refdata.entity.BackfillJobDate;
 import com.marketpulse.refdata.model.BackfillDateStatus;
+import com.marketpulse.refdata.model.BackfillJobResponse;
 import com.marketpulse.refdata.model.BackfillJobStatus;
 import com.marketpulse.refdata.model.DownloadResult;
 import com.marketpulse.refdata.repository.BackfillJobDateRepository;
@@ -80,6 +81,20 @@ public class BackfillService {
     public Optional<BackfillJob> findActiveJob() {
         return jobRepository.findFirstByStatusInOrderByCreatedAtAsc(
                 List.of(BackfillJobStatus.PENDING, BackfillJobStatus.RUNNING));
+    }
+
+    /** Full job detail including every date attempted. */
+    public Optional<BackfillJobResponse> getJobDetail(UUID jobId) {
+        return jobRepository.findById(jobId)
+                .map(job -> BackfillJobResponse.detail(job, jobDateRepository.findByJobIdOrderByTradeDateAsc(jobId)));
+    }
+
+    /** The 50 most recent jobs, newest first, without per-date breakdowns. */
+    public List<BackfillJobResponse> listRecentJobs() {
+        return jobRepository.findTop50ByOrderByCreatedAtDesc().stream()
+                .map(job -> BackfillJobResponse.summary(
+                        job, jobDateRepository.findByJobIdOrderByTradeDateAsc(job.getId())))
+                .toList();
     }
 
     /**
