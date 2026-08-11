@@ -122,6 +122,24 @@ class BackfillServiceTest {
     }
 
     @Test
+    void aRecentNotFoundIsNotTrustedAsAHolidayYet() {
+        // Within the trust window: today's/yesterday's NOT_FOUND may just mean "not yet published".
+        LocalDate recent = LocalDate.now();
+        while (recent.getDayOfWeek() == java.time.DayOfWeek.SATURDAY
+                || recent.getDayOfWeek() == java.time.DayOfWeek.SUNDAY) {
+            recent = recent.minusDays(1);
+        }
+        when(jobDateRepository.findKnownNonTradingDates(any(), any())).thenReturn(List.of(recent));
+        when(bhavcopyService.downloadBhavcopy(recent))
+                .thenReturn(DownloadResult.success(recent, "equity_price", 2416));
+        BackfillJob job = givenJob(recent, recent, false);
+
+        service.executeJob(job.getId());
+
+        verify(bhavcopyService).downloadBhavcopy(recent);
+    }
+
+    @Test
     void forceBypassesBothSkipSets() {
         LocalDate loaded = LocalDate.of(2026, 8, 6);
         LocalDate holiday = LocalDate.of(2026, 8, 7);
@@ -151,6 +169,23 @@ class BackfillServiceTest {
         verify(bhavcopyService).downloadBhavcopy(good);
         assertThat(recordedDates().get(bad).getStatus()).isEqualTo(BackfillDateStatus.FAILED);
         assertThat(recordedDates().get(bad).getMessage()).isEqualTo("boom");
+        assertThat(job.getStatus()).isEqualTo(BackfillJobStatus.COMPLETED);
+    }
+
+    @Test
+    void aThrowingDateIsRecordedFailedAndTheWalkContinues() {
+        LocalDate bad = LocalDate.of(2026, 8, 6);
+        LocalDate good = LocalDate.of(2026, 8, 7);
+        when(bhavcopyService.downloadBhavcopy(bad)).thenThrow(new IllegalArgumentException("Mapping for SERIES not found"));
+        when(bhavcopyService.downloadBhavcopy(good))
+                .thenReturn(DownloadResult.success(good, "equity_price", 2416));
+        BackfillJob job = givenJob(bad, good, false);
+
+        service.executeJob(job.getId());
+
+        assertThat(recordedDates().get(bad).getStatus()).isEqualTo(BackfillDateStatus.FAILED);
+        assertThat(recordedDates().get(bad).getMessage()).contains("Mapping for SERIES not found");
+        verify(bhavcopyService).downloadBhavcopy(good);
         assertThat(job.getStatus()).isEqualTo(BackfillJobStatus.COMPLETED);
     }
 

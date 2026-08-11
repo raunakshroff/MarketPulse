@@ -37,6 +37,12 @@ public class BackfillService {
 
     private static final Logger log = LoggerFactory.getLogger(BackfillService.class);
 
+    /**
+     * A NOT_FOUND for a very recent date may just mean NSE has not published yet, so it must not be
+     * cached as a holiday - that would skip the date forever and leave a silent gap.
+     */
+    private static final int NOT_FOUND_TRUSTED_AFTER_DAYS = 2;
+
     private final BhavcopyService bhavcopyService;
     private final EquityPriceRepository equityPriceRepository;
     private final BackfillJobRepository jobRepository;
@@ -154,7 +160,13 @@ public class BackfillService {
                 continue;
             }
 
-            DownloadResult result = bhavcopyService.downloadBhavcopy(date);
+            DownloadResult result;
+            try {
+                result = bhavcopyService.downloadBhavcopy(date);
+            } catch (RuntimeException e) {
+                log.error("Backfill job {} date {} threw unexpectedly: {}", jobId, date, e.getMessage(), e);
+                result = DownloadResult.failure(date, "Unexpected error: " + e.getMessage());
+            }
             switch (result.status()) {
                 case SUCCESS -> {
                     record(job, date, BackfillDateStatus.SUCCESS, result.rowCount(), null);
@@ -199,7 +211,12 @@ public class BackfillService {
         }
         Set<LocalDate> skip = new HashSet<>(
                 equityPriceRepository.findDistinctTradeDatesBetween(job.getFromDate(), job.getToDate()));
-        skip.addAll(jobDateRepository.findKnownNonTradingDates(job.getFromDate(), job.getToDate()));
+
+        LocalDate trustedUpTo = LocalDate.now().minusDays(NOT_FOUND_TRUSTED_AFTER_DAYS);
+        if (!trustedUpTo.isBefore(job.getFromDate())) {
+            LocalDate holidayLookupTo = trustedUpTo.isBefore(job.getToDate()) ? trustedUpTo : job.getToDate();
+            skip.addAll(jobDateRepository.findKnownNonTradingDates(job.getFromDate(), holidayLookupTo));
+        }
         return skip;
     }
 

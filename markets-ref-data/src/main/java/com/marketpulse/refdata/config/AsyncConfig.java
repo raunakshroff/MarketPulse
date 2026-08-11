@@ -1,6 +1,7 @@
 package com.marketpulse.refdata.config;
 
 import java.util.concurrent.Executor;
+import org.springframework.boot.task.ThreadPoolTaskExecutorBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableAsync;
@@ -24,5 +25,15 @@ public class AsyncConfig {
         executor.setThreadNamePrefix("backfill-");
         executor.initialize();
         return executor;
+    }
+
+    /**
+     * Boot's TaskExecutorConfiguration is @ConditionalOnMissingBean(Executor.class), so declaring
+     * backfillExecutor above would otherwise suppress the application's default executor - leaving
+     * any future unqualified @Async on an unbounded SimpleAsyncTaskExecutor. Re-declare it.
+     */
+    @Bean("applicationTaskExecutor")
+    public ThreadPoolTaskExecutor applicationTaskExecutor(ThreadPoolTaskExecutorBuilder builder) {
+        return builder.build();
     }
 }
