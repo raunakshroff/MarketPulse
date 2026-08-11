@@ -13,6 +13,7 @@ This module is responsible for systematically fetching market reference data, su
 - **Session & Header Management:** A cookie-aware `NseHttpClient` (built on `java.net.http.HttpClient`) manages session cookies and browser-like headers to bypass NSE's anti-scraping restrictions.
 - **TimescaleDB Persistence:** Rows are upserted into an `equity_price` hypertable (keyed on `trade_date, symbol`) alongside an `equity_symbol` dimension table. Schema is managed by Flyway (`db/migration`) and applied automatically at startup.
 - **REST API:** Exposes the download job and stored data over HTTP so other services can trigger/consume it.
+- **Bulk Historical Backfill:** A separate REST API queues an async job that walks a date range and downloads each missing weekday's Bhavcopy, skipping dates already stored so re-POSTing the same range resumes cheaply. NSE's archive only serves files back to 2019-10-01.
 - **Scheduled Daily Job:** Runs automatically every weekday at 19:00 IST via Spring's `@Scheduled`, with the timezone pinned explicitly so it's correct regardless of the host/container clock.
 - **Containerized:** Ships with a `Dockerfile` and `docker-compose.yml` that bring up both the service and its TimescaleDB, running continuously (`restart: unless-stopped`), which is required for the in-process scheduler to actually fire day to day.
 - **Unit Testing:** JUnit 5 + Mockito + MockMvc test suite covering the HTTP client, service, filtering, and REST layers without hitting the live NSE servers.
@@ -107,6 +108,9 @@ To point at a different database, override `SPRING_DATASOURCE_URL`, `SPRING_DATA
 #### REST API
 - `POST /api/v1/bhavcopy/download?date=YYYY-MM-DD` — triggers a download. If `date` is omitted, defaults to today, or to the preceding Friday if today is a Saturday/Sunday. `200` on success, `404` if NSE has no file for that date (holiday / not yet published), `502` on an upstream failure.
 - `GET /api/v1/bhavcopy/{date}` — returns the previously downloaded, equity-only rows for that date as JSON; `404` if nothing is stored for that date.
+- `POST /api/v1/bhavcopy/backfill?from=YYYY-MM-DD&to=YYYY-MM-DD&force=false` — queues a bulk backfill over `[from, to]` and returns immediately; the walk runs in the background. `202` with the new job (id + progress), `400` if `from` is after `to`, `to` is in the future, or `from` is before 2019-10-01 (the earliest date NSE's archive serves), `409` if a backfill job is already pending or running. Dates already stored in `equity_price` are skipped by default, so re-POSTing the same range only fetches what's still missing; pass `force=true` to re-download everything in range regardless.
+- `GET /api/v1/bhavcopy/backfill/{jobId}` — job status and a per-date breakdown (success/failed/skipped/not-found) for one backfill job; `404` if the job id is unknown.
+- `GET /api/v1/bhavcopy/backfill` — the 50 most recent backfill jobs, newest first.
 - `GET /actuator/health` — service health check.
 
 ## Research & Learnings
