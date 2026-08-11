@@ -10,9 +10,11 @@ import com.marketpulse.refdata.entity.BackfillJob;
 import com.marketpulse.refdata.entity.BackfillJobDate;
 import com.marketpulse.refdata.model.BackfillDateStatus;
 import com.marketpulse.refdata.model.BackfillJobStatus;
+import com.marketpulse.refdata.entity.EquitySymbol;
 import com.marketpulse.refdata.repository.BackfillJobDateRepository;
 import com.marketpulse.refdata.repository.BackfillJobRepository;
 import com.marketpulse.refdata.repository.EquityPriceRepository;
+import com.marketpulse.refdata.repository.EquitySymbolRepository;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.List;
@@ -69,6 +71,9 @@ class BackfillServiceIT {
     @Autowired
     private EquityPriceRepository equityPriceRepository;
 
+    @Autowired
+    private EquitySymbolRepository equitySymbolRepository;
+
     @Test
     void runsARangeThenSkipsEverythingOnASecondRun() throws Exception {
         LocalDate thursday = LocalDate.of(2026, 8, 6);
@@ -119,5 +124,32 @@ class BackfillServiceIT {
 
         assertThat(jobDateRepository.findByJobIdOrderByTradeDateAsc(second.getId()).get(0).getStatus())
                 .isEqualTo(BackfillDateStatus.SKIPPED);
+    }
+
+    @Test
+    void loadingAnOlderDateAfterANewerOneWidensTheSeenWindowInsteadOfOverwritingIt() throws Exception {
+        // Backfills load history out of chronological order, so the newer date is loaded first here -
+        // exactly the scenario that used to leave last_seen_date stuck on the older of the two.
+        LocalDate newer = LocalDate.of(2020, 1, 7);
+        LocalDate older = LocalDate.of(2020, 1, 6);
+        when(nseHttpClient.downloadFile(anyString()))
+                .thenAnswer(inv -> {
+                    String url = inv.getArgument(0);
+                    return url.contains("07012020") ? csvFor(newer) : csvFor(older);
+                });
+
+        BackfillJob newerJob = backfillService.createJob(newer, newer, false);
+        backfillService.executeJob(newerJob.getId());
+
+        EquitySymbol afterNewer = equitySymbolRepository.findById("20MICRONS").orElseThrow();
+        assertThat(afterNewer.getFirstSeenDate()).isEqualTo(newer);
+        assertThat(afterNewer.getLastSeenDate()).isEqualTo(newer);
+
+        BackfillJob olderJob = backfillService.createJob(older, older, false);
+        backfillService.executeJob(olderJob.getId());
+
+        EquitySymbol afterOlder = equitySymbolRepository.findById("20MICRONS").orElseThrow();
+        assertThat(afterOlder.getFirstSeenDate()).isEqualTo(older);
+        assertThat(afterOlder.getLastSeenDate()).isEqualTo(newer);
     }
 }

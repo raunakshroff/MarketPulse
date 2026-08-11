@@ -12,7 +12,8 @@ public class EquitySymbolRepositoryImpl implements EquitySymbolRepositoryCustom 
             INSERT INTO equity_symbol (symbol, first_seen_date, last_seen_date)
             VALUES (?, ?, ?)
             ON CONFLICT (symbol) DO UPDATE SET
-                last_seen_date = EXCLUDED.last_seen_date
+                first_seen_date = LEAST(equity_symbol.first_seen_date, EXCLUDED.first_seen_date),
+                last_seen_date = GREATEST(equity_symbol.last_seen_date, EXCLUDED.last_seen_date)
             """;
 
     private final JdbcTemplate jdbcTemplate;
