@@ -23,10 +23,12 @@ public class EquitySymbolRepositoryImpl implements EquitySymbolRepositoryCustom 
 
     @Override
     public void upsertAll(List<String> symbols, LocalDate seenDate) {
-        jdbcTemplate.batchUpdate(UPSERT_SQL, symbols, 500, (ps, symbol) -> {
-            ps.setString(1, symbol);
-            ps.setObject(2, seenDate);
-            ps.setObject(3, seenDate);
-        });
+        if (symbols != null && !symbols.isEmpty()) {
+            jdbcTemplate.batchUpdate(UPSERT_SQL, symbols, 500, (ps, symbol) -> {
+                ps.setString(1, symbol);
+                ps.setObject(2, seenDate);
+                ps.setObject(3, seenDate);
+            });
+        }
     }
 }

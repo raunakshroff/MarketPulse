@@ -1,9 +1,11 @@
 package com.marketpulse.refdata.repository;
 
-import com.marketpulse.refdata.entity.EquityPrice;
 import java.util.List;
+
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
+
+import com.marketpulse.refdata.entity.EquityPrice;
 
 @Repository
 public class EquityPriceRepositoryImpl implements EquityPriceRepositoryCustom {
@@ -38,6 +40,9 @@ public class EquityPriceRepositoryImpl implements EquityPriceRepositoryCustom {
 
     @Override
     public void upsertAll(List<EquityPrice> rows) {
+        if (rows == null || rows.isEmpty()) {
+            return;
+        }
         jdbcTemplate.batchUpdate(UPSERT_SQL, rows, 500, (ps, row) -> {
             ps.setObject(1, row.getTradeDate());
             ps.setString(2, row.getSymbol());
