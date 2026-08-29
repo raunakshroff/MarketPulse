@@ -52,8 +52,8 @@ class BhavcopyServiceIT {
 
     @Test
     void downloadPersistsAndReDownloadUpsertsRatherThanDuplicates() throws Exception {
-        LocalDate date = LocalDate.of(2025, 11, 14);
-        String downloadUrl = ARCHIVE_URL + "sec_bhavdata_full_14112025.csv";
+        LocalDate date = LocalDate.of(2026, 7, 10);
+        String downloadUrl = ARCHIVE_URL + "sec_bhavdata_full_10072026.csv";
 
         when(nseHttpClient.downloadFile(downloadUrl)).thenReturn(csv("193.94"));
         DownloadResult first = bhavcopyService.downloadBhavcopy(date);
@@ -69,7 +69,7 @@ class BhavcopyServiceIT {
         assertThat(records).hasSize(1);
         assertThat(records.get(0).symbol()).isEqualTo("20MICRONS");
         assertThat(records.get(0).prevClose()).isEqualByComparingTo("999.99");
-        assertThat(records.get(0).date()).isEqualTo("14-Nov-2025");
+        assertThat(records.get(0).date()).isEqualTo("10-Jul-2026");
 
         assertThat(equitySymbolRepository.findById("20MICRONS")).hasValueSatisfying(symbol -> {
             assertThat(symbol.getFirstSeenDate()).isEqualTo(date);

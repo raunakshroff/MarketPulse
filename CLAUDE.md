@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project Overview
 
 MarketPulse is a multi-module project for enterprise/professional-level markets data tracking and analysis, split CQRS-style across three modules that share one TimescaleDB database:
-- **`markets-ref-data`** — the write/ingestion side. A Spring Boot microservice that fetches daily NSE Bhavcopy EOD equity prices and, on demand, company fundamentals from Yahoo Finance, persisting both to TimescaleDB. Owns the schema via Flyway.
+- **`markets-ref-data`** — the write/ingestion side. A Spring Boot microservice that fetches daily NSE Bhavcopy EOD equity prices (on a schedule, on demand, or in bulk via the backfill API) and, on demand, company fundamentals from Yahoo Finance, persisting all of it to TimescaleDB. Owns the schema via Flyway.
 - **`stock-discovery`** — the read/query side. A read-only Spring Boot microservice against the same database (`ddl-auto: none`, no Flyway) exposing search/history/fundamentals APIs for the UI.
 - **`markets-ui`** — the frontend. A React + Vite + TypeScript app translated from the "Strata" design, calling `stock-discovery` for real data.
 
@@ -20,7 +20,7 @@ Each backend module has its own commands, run from its own directory. Requires J
 ```powershell
 cd markets-ref-data
 
-# Run the full test suite
+# Run the full test suite (unit tests only - see note below)
 mvn test
 
 # Run a single test class
@@ -29,7 +29,12 @@ mvn test -Dtest=BhavcopyServiceTest
 # Run a single test method
 mvn test -Dtest=BhavcopyServiceTest#treats404AsNotFoundRatherThanFailure
 
+# Run either Testcontainers integration test (opt-in, needs a running Docker daemon)
+mvn test -Dtest=BhavcopyServiceIT -DfailIfNoTests=false
+mvn test -Dtest=BackfillServiceIT -DfailIfNoTests=false
+
 # Run the app locally in the foreground (needs TimescaleDB reachable at localhost:5432)
+docker compose -f ../docker-compose.yml up -d timescaledb   # database only
 mvn spring-boot:run
 
 # Build a runnable jar
@@ -42,7 +47,9 @@ cd ..
 docker compose up -d --build
 ```
 
-There is no linter/formatter config in this repo yet. `BhavcopyServiceIT` (Testcontainers-backed) is **not** picked up by `mvn test` — Surefire's default pattern only matches `*Test.java`, and no Failsafe plugin is configured. Run it explicitly: `mvn test -Dtest=BhavcopyServiceIT -DfailIfNoTests=false` (requires a working local Docker environment reachable by the Testcontainers Java library specifically, which has been flaky on this Windows/Docker Desktop setup even when the Docker CLI itself works fine).
+There is no linter/formatter config in this repo yet. **Neither `BhavcopyServiceIT` nor `BackfillServiceIT` is picked up by `mvn test`** — Surefire's default pattern only matches `*Test.java`, and no Failsafe plugin is configured, so the Testcontainers tests only run when named explicitly (see above). They require a working local Docker environment reachable by the Testcontainers Java library specifically, which has been flaky on this Windows/Docker Desktop setup even when the Docker CLI itself works fine. The default `mvn test` run is 54 tests and needs neither Docker nor network.
+
+**The app cannot start without a reachable TimescaleDB** — Flyway migrates on boot and JPA runs with `ddl-auto: validate`. Connection settings come from `SPRING_DATASOURCE_URL`/`_USERNAME`/`_PASSWORD`, defaulting to `jdbc:postgresql://localhost:5432/marketpulse` (which the composed `timescaledb` container serves on the published port).
 
 `stock-discovery/` supports the same `mvn test` / `mvn test -Dtest=...` / `mvn spring-boot:run` / `mvn package` commands (port 8082, no Testcontainers/IT test in this module since it has no Flyway migrations of its own to exercise).
 
@@ -68,6 +75,10 @@ npm run build   # tsc -b && vite build, output in dist/
 8. **[controller/BhavcopyController.java](markets-ref-data/src/main/java/com/marketpulse/refdata/controller/BhavcopyController.java)** — `POST /api/v1/bhavcopy/download?date=...` (omitted `date` defaults to today, or the preceding Friday via the package-private `lastWeekday()` helper if today is a Saturday/Sunday) and `GET /api/v1/bhavcopy/{date}`.
 9. **[controller/FundamentalsController.java](markets-ref-data/src/main/java/com/marketpulse/refdata/controller/FundamentalsController.java)** — `POST /api/v1/fundamentals/refresh?symbols=A,B` (comma-separated, Spring auto-splits into `List<String>`) and `GET /api/v1/fundamentals/{symbol}`.
 10. **[scheduler/BhavcopyScheduler.java](markets-ref-data/src/main/java/com/marketpulse/refdata/scheduler/BhavcopyScheduler.java)** — `@Scheduled(cron = "${nse.scheduler.cron}", zone = "${nse.scheduler.zone}")`. **The `zone` is pinned explicitly to `Asia/Kolkata`** — without it, a containerized JVM defaults to UTC and "19:00" would fire at the wrong wall-clock time. Disable via `nse.scheduler.enabled=false`. Fundamentals has no equivalent scheduler.
+11. **[service/BackfillService.java](markets-ref-data/src/main/java/com/marketpulse/refdata/service/BackfillService.java)** — bulk historical loader. Walks the weekdays in a date range and calls `BhavcopyService.downloadBhavcopy` once per date. **Deliberately a separate bean**: calling across a bean boundary means the `@Transactional` proxy on `downloadBhavcopy` actually applies, so each date commits independently and a failure late in a multi-year run can't roll back the days already loaded. Runs `@Async` on a single-thread `backfillExecutor` so two backfills never hit NSE at once. Skips dates already in `equity_price` and dates any prior job recorded `NOT_FOUND` (holidays), which is what makes a re-POST of the same range resume cheaply; `force=true` bypasses both.
+12. **[controller/BackfillController.java](markets-ref-data/src/main/java/com/marketpulse/refdata/controller/BackfillController.java)** — `POST /api/v1/bhavcopy/backfill?from=&to=[&force=]` (202 + jobId, 409 if one is already active), `GET /api/v1/bhavcopy/backfill/{jobId}`, `GET /api/v1/bhavcopy/backfill`. Rejects `from > to`, a future `to`, and any `from` before `nse.backfill.earliest-date`.
+13. **[service/BackfillStartupReconciler.java](markets-ref-data/src/main/java/com/marketpulse/refdata/service/BackfillStartupReconciler.java)** — on boot, marks PENDING/RUNNING jobs `INTERRUPTED`; the JVM that owned them is gone. Does **not** auto-resume, so a restart loop can't silently generate ~90 minutes of NSE traffic. Recovery is re-POSTing the same range.
+14. **[config/AsyncConfig.java](markets-ref-data/src/main/java/com/marketpulse/refdata/config/AsyncConfig.java)** — `@EnableAsync` plus the single-thread `backfillExecutor`. It **also re-declares Boot's default executor under both `applicationTaskExecutor` and `taskExecutor`**: Boot's own `TaskExecutorConfiguration` is `@ConditionalOnMissingBean(Executor.class)`, so declaring `backfillExecutor` alone would suppress the default and silently drop any future unqualified `@Async` onto an unbounded `SimpleAsyncTaskExecutor`.
 
 ### Package layout (`com.marketpulse.stockdiscovery`, in `stock-discovery/`)
 
@@ -97,7 +108,10 @@ Translates the "Strata" design (a Claude Design canvas project — `Strata.dc.ht
 - **`equity_symbol`** — dimension table (symbol, first/last-seen dates). Correct normalization boundary: slowly-changing entity metadata, separate from time-series facts.
 - **`equity_price`** — TimescaleDB hypertable, `(trade_date, symbol)` composite PK, partitioned by `trade_date`. Deliberately **not** split further by column group (e.g. price vs. volume/delivery stats) — OHLCV-style data is conventionally kept as one row per symbol per day since it's always written/queried together; splitting would mean joining two hypertables for what's currently a single-row read, for no real benefit at this row volume.
 - **`equity_fundamentals`** — plain table (not a hypertable), symbol PK with FK to `equity_symbol`. Fundamentals are a slowly-changing snapshot per symbol, not a daily time series, so this follows the `equity_symbol` dimension-table pattern rather than `equity_price`'s.
-- Flyway migrations in `db/migration/`: `V1` creates the hypertable, `V2` adds `equity_fundamentals`.
+- **`backfill_job` / `backfill_job_date`** — plain tables tracking bulk-load jobs and their per-date outcome. The per-date rows are what make a re-POST of the same range cheap (already-loaded dates and previously-`NOT_FOUND` holidays are skipped) and what `BackfillStartupReconciler` reconciles after a restart.
+- Flyway migrations in `db/migration/`: `V1` creates the hypertable, `V2` adds `equity_fundamentals`, `V3` adds the backfill job tables, `V4` repairs `equity_symbol` first/last-seen dates.
+
+**On migration numbering:** `V3`/`V4` were `V2`/`V3` on the backfill branch and were renumbered when it merged, because `V2__create_equity_fundamentals.sql` had already been applied to the live database and a version number cannot move once Flyway has recorded it. If you developed against the pre-merge branch, your local `flyway_schema_history` still has `V2 = create backfill job` and will not reconcile — recreate that database (`docker compose down -v`) rather than editing history. **Never renumber or edit an applied migration; always add a new one.**
 
 ### Deployment: why this must run continuously
 
@@ -109,6 +123,8 @@ JUnit 5 + Mockito + AssertJ; controller tests use `@WebMvcTest` + `MockMvc` + `@
 - **[client/NseHttpClientTest.java](markets-ref-data/src/test/java/com/marketpulse/refdata/client/NseHttpClientTest.java)** / **[client/YahooFinanceClientTest.java](markets-ref-data/src/test/java/com/marketpulse/refdata/client/YahooFinanceClientTest.java)** mock `java.net.http.HttpClient` directly (it's injected, not constructed internally, specifically so this is mockable) and distinguish calls by inspecting the request URI in `thenAnswer`, since matching on `BodyHandlers.discarding()`/`ofByteArray()`/`ofString()` by equality doesn't work (fresh lambda instances each call).
 - **[service/BhavcopyServiceTest.java](markets-ref-data/src/test/java/com/marketpulse/refdata/service/BhavcopyServiceTest.java)** / **[service/FundamentalsServiceTest.java](markets-ref-data/src/test/java/com/marketpulse/refdata/service/FundamentalsServiceTest.java)** mock the repository layer directly (`equityPriceRepository`, `equitySymbolRepository`, `equityFundamentalsRepository`) rather than hitting a real DB.
 - **[service/BhavcopyServiceIT.java](markets-ref-data/src/test/java/com/marketpulse/refdata/service/BhavcopyServiceIT.java)** is the real-DB integration test, using `@Testcontainers` + `PostgreSQLContainer` (image `timescale/timescaledb:...`) — exercises the actual Flyway migration, hypertable, and upsert-not-duplicate behavior end-to-end.
+- **[service/BackfillServiceTest.java](markets-ref-data/src/test/java/com/marketpulse/refdata/service/BackfillServiceTest.java)** mocks `BhavcopyService` and all three repositories, and sets `delay-ms` to 0 so the throttle doesn't slow the suite. Covers weekend exclusion, both skip sets, `force`, per-date failure isolation, and the consecutive-failure circuit breaker.
+- **[service/BackfillServiceIT.java](markets-ref-data/src/test/java/com/marketpulse/refdata/service/BackfillServiceIT.java)** is the second Testcontainers test — same opt-in rules as `BhavcopyServiceIT`. Covers the backfill migration, skip-on-re-run, holiday recording, and the out-of-order `equity_symbol` seen-window widening that backfills specifically provoke.
 - **[controller/BhavcopyControllerTest.java](markets-ref-data/src/test/java/com/marketpulse/refdata/controller/BhavcopyControllerTest.java)** / **[controller/FundamentalsControllerTest.java](markets-ref-data/src/test/java/com/marketpulse/refdata/controller/FundamentalsControllerTest.java)** — `@WebMvcTest` slices **must** exclude `SecurityAutoConfiguration`, `UserDetailsServiceAutoConfiguration`, `SecurityFilterAutoConfiguration`, and `ServletWebSecurityAutoConfiguration` explicitly (see Spring Boot 4.x note below), or the test slice enforces real HTTP Basic auth and every request 401s/403s.
 
 `stock-discovery` follows the identical pattern in its own `src/test/java/com/marketpulse/stockdiscovery/` tree — `StockDiscoveryServiceTest` mocks the three repositories directly, `StockDiscoveryControllerTest` is a `@WebMvcTest` with the same four Security auto-config exclusions. It has no Testcontainers/IT test since it owns no Flyway migrations to exercise end-to-end.
@@ -120,6 +136,9 @@ JUnit 5 + Mockito + AssertJ; controller tests use `@WebMvcTest` + `MockMvc` + `@
 - NSE aggressively blocks scraping; requests without proper headers return `401`/`403`. A session must be established by visiting `nseindia.com` first — this is why `NseHttpClient` performs a warm-up `GET` in its constructor. Realistic browser `User-Agent`/`Accept`/`Accept-Language` headers (see `nse.headers` in `application.yml`) are required.
 - NSE's Bhavcopy/quote data carries price and trading-activity fields only — **no market cap, P/E, sector, or company description**. That's why fundamentals come from a separate source (Yahoo Finance) entirely.
 - Yahoo Finance's unofficial API needs the cookie+crumb handshake described above, and rate-limits hard under repeated manual testing — expect to hit `429`s if iterating quickly during development.
+- The `sec_bhavdata_full_DDMMYYYY.csv` archive pattern only goes back to **2019-10-01**. Earlier dates 404. Older history exists under NSE's legacy `cm<DD><MON><YYYY>bhav.csv.zip` path but lacks the delivery columns this schema requires — hence `nse.backfill.earliest-date`.
+- **`sec_bhavdata_full_30092019.csv` returns HTTP 200 with rows dated `27-Jun-2019`.** `BhavcopyService` therefore validates the CSV's `DATE1` column against the requested date and refuses to persist a mismatch — without that guard, `trade_date` is stamped from the requested date and bad data lands silently. This is why `earliest-date` is 2019-10-01, not 2019-09-30.
+- `GET /api/v1/bhavcopy/backfill` (the list endpoint) issues one query per job returned — up to 51 for a full page of 50 — because the per-status counts are derived by loading each job's date rows. Accepted deliberately: it's an operator-driven endpoint, hit a handful of times, and correctness isn't at stake. If job volume grows, replace it with a `GROUP BY job_id, status` aggregate.
 
 ### Spring Boot 4.x / Java 25 upgrade notes
 

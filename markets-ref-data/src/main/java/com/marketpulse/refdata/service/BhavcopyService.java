@@ -73,6 +73,9 @@ public class BhavcopyService {
             }
             log.error("HTTP error occurred: {}", e.getMessage());
             return DownloadResult.failure(date, e.getMessage());
+        } catch (DateMismatchException e) {
+            log.error("{}", e.getMessage());
+            return DownloadResult.failure(date, e.getMessage());
         } catch (IOException e) {
             log.error("An unexpected error occurred: {}", e.getMessage());
             return DownloadResult.failure(date, e.getMessage());
@@ -95,6 +98,13 @@ public class BhavcopyService {
         try (CSVParser parser = CSVParser.parse(new String(filtered, StandardCharsets.UTF_8), format)) {
             List<EquityPrice> rows = new ArrayList<>();
             for (CSVRecord record : parser) {
+                LocalDate contentDate = LocalDate.parse(record.get("DATE1"), WIRE_DATE_FORMAT);
+                if (!contentDate.equals(date)) {
+                    throw new DateMismatchException(
+                            "Bhavcopy content date mismatch: requested " + date
+                                    + " but the downloaded file contains rows dated " + contentDate
+                                    + ". Refusing to persist.");
+                }
                 rows.add(new EquityPrice(
                         date,
                         record.get("SYMBOL"),
@@ -137,5 +147,12 @@ public class BhavcopyService {
 
     private String fileNameFor(LocalDate date) {
         return "sec_bhavdata_full_" + date.format(ARCHIVE_FILE_DATE_FORMAT) + ".csv";
+    }
+
+    /** Raised when the downloaded CSV's DATE1 column disagrees with the date we asked for. */
+    private static class DateMismatchException extends RuntimeException {
+        DateMismatchException(String message) {
+            super(message);
+        }
     }
 }

@@ -15,12 +15,13 @@ This module is responsible for systematically fetching market reference data —
 **Key Features:**
 - **Automated Bhavcopy Downloads:** Fetches end-of-day (EOD) Bhavcopy CSVs from the National Stock Exchange (NSE), filtered down to Equity (`SERIES == EQ`) rows only.
 - **TimescaleDB Persistence:** Daily prices land in a `equity_price` hypertable (partitioned by trade date) keyed by `(trade_date, symbol)`; re-running a download for the same date upserts rather than duplicates. A companion `equity_symbol` table tracks first/last-seen dates per ticker.
+- **Bulk Historical Backfill:** A separate REST API queues an async job that walks a date range and downloads each missing weekday's Bhavcopy, skipping dates already stored so re-POSTing the same range resumes cheaply. NSE's archive only serves files back to 2019-10-01.
 - **Company Fundamentals:** Fetches market cap, P/E ratio, sector/industry, and a company description from Yahoo Finance's unofficial API on demand, stored in `equity_fundamentals`.
 - **Session & Header Management:** A cookie-aware `NseHttpClient` (built on `java.net.http.HttpClient`) manages session cookies and browser-like headers to bypass NSE's anti-scraping restrictions; `YahooFinanceClient` similarly handles Yahoo's cookie+crumb handshake.
-- **REST API:** Exposes both the download job and fundamentals refresh, plus the stored data, over HTTP so other services can trigger/consume it.
-- **Scheduled Daily Job:** Bhavcopy downloads run automatically every weekday at 19:00 IST via Spring's `@Scheduled`, with the timezone pinned explicitly so it's correct regardless of the host/container clock. (Fundamentals refresh is on-demand only — no schedule.)
-- **Containerized:** Ships with a `Dockerfile` and `docker-compose.yml` (app + TimescaleDB) so the service can run continuously (`restart: unless-stopped`), which is required for the in-process scheduler to actually fire day to day.
-- **Unit Testing:** JUnit 5 + Mockito + MockMvc test suite covering both HTTP clients, both services, filtering, and the REST layers without hitting the live NSE/Yahoo servers.
+- **REST API:** Exposes the download job, the bulk backfill jobs, and the fundamentals refresh, plus the stored data, over HTTP so other services can trigger/consume it.
+- **Scheduled Daily Job:** Bhavcopy downloads run automatically every weekday at 19:00 IST via Spring's `@Scheduled`, with the timezone pinned explicitly so it's correct regardless of the host/container clock. (Backfill and fundamentals refresh are on-demand only — no schedule.)
+- **Containerized:** Ships with a `Dockerfile`, and the repo-root `docker-compose.yml` brings it up alongside TimescaleDB running continuously (`restart: unless-stopped`), which is required for the in-process scheduler to actually fire day to day.
+- **Unit Testing:** JUnit 5 + Mockito + MockMvc test suite covering both HTTP clients, all services, filtering, and the REST layers without hitting the live NSE/Yahoo servers.
 
 #### Directory Layout
 ```text
@@ -28,19 +29,18 @@ markets-ref-data/
 ├── src/main/java/com/marketpulse/refdata/
 │   ├── RefDataApplication.java     # Spring Boot entry point
 │   ├── client/                     # NseHttpClient, YahooFinanceClient (+ their exceptions)
-│   ├── config/                     # NseProperties, YahooFinanceProperties, HttpClientConfig
-│   ├── controller/                 # BhavcopyController, FundamentalsController (REST API)
-│   ├── entity/                     # EquityPrice, EquitySymbol, EquityFundamentals (JPA)
-│   ├── model/                      # DownloadResult, EquityRecord, FundamentalsResult, FundamentalsView
+│   ├── config/                     # NseProperties, YahooFinanceProperties, HttpClientConfig, AsyncConfig
+│   ├── controller/                 # BhavcopyController, BackfillController, FundamentalsController
+│   ├── entity/                     # EquityPrice, EquitySymbol, EquityFundamentals, BackfillJob(+Date)
+│   ├── model/                      # DownloadResult, EquityRecord, FundamentalsResult/View, Backfill*Status
 │   ├── repository/                 # JPA repos + JdbcTemplate-based upsert impls
 │   ├── scheduler/                  # BhavcopyScheduler (daily cron job)
-│   └── service/                    # BhavcopyService, EquityCsvFilter, FundamentalsService
+│   └── service/                    # BhavcopyService, BackfillService, EquityCsvFilter, FundamentalsService
 ├── src/main/resources/
 │   ├── application.yml
-│   └── db/migration/               # Flyway: V1 equity_price hypertable, V2 equity_fundamentals
+│   └── db/migration/               # Flyway: V1 hypertable, V2 fundamentals, V3 backfill jobs, V4 seen-date repair
 ├── src/test/java/...                # Mirrors main/, JUnit 5 + Mockito + MockMvc
 ├── Dockerfile                       # Multi-stage build (Maven -> slim JRE)
-├── docker-compose.yml               # app + timescaledb, restart: unless-stopped
 └── pom.xml
 ```
 
@@ -51,15 +51,20 @@ markets-ref-data/
    cd markets-ref-data
    mvn test
    ```
-3. **Run locally (foreground):**
+3. **Run locally (foreground):** the service needs a reachable TimescaleDB to start at all (Flyway migrates on boot and Hibernate validates the schema), so bring the database up first:
    ```powershell
+   docker compose -f ../docker-compose.yml up -d timescaledb
    mvn spring-boot:run
    ```
-4. **Run continuously via Docker (recommended):** see [Running everything together](#running-everything-together) below — `docker-compose.yml` now lives at the repo root and brings up all four services (this module included) together.
+   To point at a different database, override `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME` and `SPRING_DATASOURCE_PASSWORD`. To stop the daily job firing, set `nse.scheduler.enabled=false`.
+4. **Run continuously via Docker (recommended):** see [Running everything together](#running-everything-together) below — `docker-compose.yml` lives at the repo root and brings up all four services (this module included) together.
 
 #### REST API
-- `POST /api/v1/bhavcopy/download?date=YYYY-MM-DD` — triggers a download. If `date` is omitted, defaults to today, or to the preceding Friday if today is a Saturday/Sunday.
-- `GET /api/v1/bhavcopy/{date}` — returns the previously downloaded, equity-only rows for that date as JSON.
+- `POST /api/v1/bhavcopy/download?date=YYYY-MM-DD` — triggers a download. If `date` is omitted, defaults to today, or to the preceding Friday if today is a Saturday/Sunday. `200` on success, `404` if NSE has no file for that date (holiday / not yet published), `502` on an upstream failure.
+- `GET /api/v1/bhavcopy/{date}` — returns the previously downloaded, equity-only rows for that date as JSON; `404` if nothing is stored for that date.
+- `POST /api/v1/bhavcopy/backfill?from=YYYY-MM-DD&to=YYYY-MM-DD&force=false` — queues a bulk backfill over `[from, to]` and returns immediately; the walk runs in the background. `202` with the new job (id + progress), `400` if `from` is after `to`, `to` is in the future, or `from` is before 2019-10-01 (the earliest date NSE's archive serves), `409` if a backfill job is already pending or running. Dates already stored in `equity_price` are skipped by default, so re-POSTing the same range only fetches what is still missing; pass `force=true` to re-download everything in range regardless.
+- `GET /api/v1/bhavcopy/backfill/{jobId}` — job status and a per-date breakdown (success/failed/skipped/not-found) for one backfill job; `404` if the job id is unknown.
+- `GET /api/v1/bhavcopy/backfill` — the 50 most recent backfill jobs, newest first.
 - `POST /api/v1/fundamentals/refresh?symbols=RELIANCE,TCS` — fetches and stores fundamentals for one or more symbols (comma-separated) from Yahoo Finance; returns a per-symbol SUCCESS/NOT_FOUND/FAILURE result so one bad symbol doesn't fail the rest.
 - `GET /api/v1/fundamentals/{symbol}` — returns previously fetched fundamentals for a symbol, 404 if never refreshed.
 - `GET /actuator/health` — service health check.
