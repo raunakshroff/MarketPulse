@@ -14,18 +14,29 @@ import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.boot.security.autoconfigure.SecurityAutoConfiguration;
+import org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration;
+import org.springframework.boot.security.autoconfigure.web.servlet.SecurityFilterAutoConfiguration;
+import org.springframework.boot.security.autoconfigure.web.servlet.ServletWebSecurityAutoConfiguration;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.test.web.servlet.MockMvc;
 
-@WebMvcTest(BhavcopyController.class)
+@WebMvcTest(
+        controllers = BhavcopyController.class,
+        excludeAutoConfiguration = {
+            SecurityAutoConfiguration.class,
+            UserDetailsServiceAutoConfiguration.class,
+            SecurityFilterAutoConfiguration.class,
+            ServletWebSecurityAutoConfiguration.class
+        })
 class BhavcopyControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
 
-    @MockBean
+    @MockitoBean
     private BhavcopyService bhavcopyService;
 
     @Test

@@ -4,6 +4,9 @@ server:
 spring:
   application:
     name: markets-ref-data
+  threads:
+    virtual:
+      enabled: true
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/marketpulse}
     username: ${SPRING_DATASOURCE_USERNAME:marketpulse}
@@ -42,6 +45,22 @@ nse:
     max-consecutive-failures: 10
     # NSE serves no usable sec_bhavdata_full file before this date.
     earliest-date: 2019-10-01
+
+yahoo-finance:
+  # Anti-bot handshake: warm up a cookie, then fetch a crumb, then pass both
+  # on the actual quoteSummary request - a plain request 401s with "Invalid Crumb".
+  cookie-warmup-url: https://fc.yahoo.com
+  crumb-url: https://query1.finance.yahoo.com/v1/test/getcrumb
+  quote-summary-url: https://query1.finance.yahoo.com/v10/finance/quoteSummary
+
+springdoc:
+  # Swagger UI at /swagger-ui.html, raw OpenAPI 3 JSON at /v3/api-docs.
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: alpha
+  api-docs:
+    path: /v3/api-docs
 
 management:
   endpoints:
