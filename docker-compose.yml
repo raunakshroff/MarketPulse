@@ -18,7 +18,7 @@ services:
       retries: 10
 
   markets-ref-data:
-    build: .
+    build: ./markets-ref-data
     image: markets-ref-data:latest
     container_name: markets-ref-data
     restart: unless-stopped
@@ -33,5 +33,34 @@ services:
       timescaledb:
         condition: service_healthy
 
+  stock-discovery:
+    build: ./stock-discovery
+    image: stock-discovery:latest
+    container_name: stock-discovery
+    restart: unless-stopped
+    ports:
+      - "8082:8082"
+    environment:
+      TZ: Asia/Kolkata
+      SPRING_DATASOURCE_URL: jdbc:postgresql://timescaledb:5432/marketpulse
+      SPRING_DATASOURCE_USERNAME: marketpulse
+      SPRING_DATASOURCE_PASSWORD: marketpulse
+      APP_CORS_ALLOWED_ORIGINS: http://localhost:3000
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+
+  markets-ui:
+    build: ./markets-ui
+    image: markets-ui:latest
+    container_name: markets-ui
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - stock-discovery
+
 volumes:
   timescaledb-data:
+    external: true
+    name: markets-ref-data_timescaledb-data
