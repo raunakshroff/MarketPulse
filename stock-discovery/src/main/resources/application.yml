@@ -1,0 +1,43 @@
+server:
+  port: 8082
+
+spring:
+  application:
+    name: stock-discovery
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/marketpulse}
+    username: ${SPRING_DATASOURCE_USERNAME:marketpulse}
+    password: ${SPRING_DATASOURCE_PASSWORD:marketpulse}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    # Read-only service: the schema is owned and migrated by markets-ref-data (Flyway).
+    # This service never migrates or alters it, so ddl-auto is "none" rather than "validate".
+    hibernate:
+      ddl-auto: none
+    open-in-view: false
+  threads:
+    virtual:
+      enabled: true
+
+app:
+  cors:
+    allowed-origins: http://localhost:3000,http://localhost:5173
+
+springdoc:
+  # Swagger UI at /swagger-ui.html, raw OpenAPI 3 JSON at /v3/api-docs.
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: alpha
+  api-docs:
+    path: /v3/api-docs
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %-5level - %logger{36} - %msg%n"

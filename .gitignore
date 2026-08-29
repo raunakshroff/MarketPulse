@@ -18,8 +18,12 @@ venv/
 env/
 ENV/
 
-# Environment variables
+# Environment variables (markets-ui/.env.example is committed as the template)
 .env
+
+# Editor / IDE local settings
+.vscode/
+.idea/
 
 # Fetched market data output
 markets-ref-data/data/

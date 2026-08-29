@@ -12,30 +12,17 @@
     </parent>
 
     <groupId>com.marketpulse</groupId>
-    <artifactId>markets-ref-data</artifactId>
+    <artifactId>stock-discovery</artifactId>
     <version>0.1.0-SNAPSHOT</version>
-    <name>markets-ref-data</name>
-    <description>MarketPulse reference data microservice - NSE Bhavcopy (equity) ingestion</description>
+    <name>stock-discovery</name>
+    <description>MarketPulse stock discovery microservice - search and read-model APIs for the UI</description>
 
     <properties>
         <java.version>25</java.version>
-        <testcontainers.version>1.21.3</testcontainers.version>
         <!-- springdoc 3.x is the Spring Boot 4 line (built against spring-boot-starter-parent 4.1.0);
              the 2.x line targets Spring Boot 3 and will not work here. -->
         <springdoc.version>3.1.0</springdoc.version>
     </properties>
-
-    <dependencyManagement>
-        <dependencies>
-            <dependency>
-                <groupId>org.testcontainers</groupId>
-                <artifactId>testcontainers-bom</artifactId>
-                <version>${testcontainers.version}</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
-        </dependencies>
-    </dependencyManagement>
 
     <dependencies>
         <dependency>
@@ -43,7 +30,7 @@
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
         <!-- Spring Boot 4 defaults to Jackson 3 (tools.jackson); keep classic Jackson 2
-             (com.fasterxml.jackson) since YahooFinanceClient/FundamentalsService use its API. -->
+             for consistency with markets-ref-data's DTOs (BigDecimal/OffsetDateTime handling). -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-jackson2</artifactId>
@@ -60,19 +47,6 @@
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
             <scope>runtime</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-flyway</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.flywaydb</groupId>
-            <artifactId>flyway-database-postgresql</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.commons</groupId>
-            <artifactId>commons-csv</artifactId>
-            <version>1.11.0</version>
         </dependency>
         <!-- Swagger UI + OpenAPI 3 docs at /swagger-ui.html and /v3/api-docs -->
         <dependency>
@@ -96,21 +70,6 @@
         <dependency>
             <groupId>org.springframework.security</groupId>
             <artifactId>spring-security-test</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-testcontainers</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.testcontainers</groupId>
-            <artifactId>junit-jupiter</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.testcontainers</groupId>
-            <artifactId>postgresql</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>
