@@ -46,6 +46,15 @@ yahoo-finance:
   crumb-url: https://query1.finance.yahoo.com/v1/test/getcrumb
   quote-summary-url: https://query1.finance.yahoo.com/v10/finance/quoteSummary
 
+springdoc:
+  # Swagger UI at /swagger-ui.html, raw OpenAPI 3 JSON at /v3/api-docs.
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: alpha
+  api-docs:
+    path: /v3/api-docs
+
 management:
   endpoints:
     web:

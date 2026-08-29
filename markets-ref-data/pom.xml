@@ -20,6 +20,9 @@
     <properties>
         <java.version>25</java.version>
         <testcontainers.version>1.21.3</testcontainers.version>
+        <!-- springdoc 3.x is the Spring Boot 4 line (built against spring-boot-starter-parent 4.1.0);
+             the 2.x line targets Spring Boot 3 and will not work here. -->
+        <springdoc.version>3.1.0</springdoc.version>
     </properties>
 
     <dependencyManagement>
@@ -70,6 +73,12 @@
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-csv</artifactId>
             <version>1.11.0</version>
+        </dependency>
+        <!-- Swagger UI + OpenAPI 3 docs at /swagger-ui.html and /v3/api-docs -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>${springdoc.version}</version>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
