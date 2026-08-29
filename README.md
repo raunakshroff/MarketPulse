@@ -41,7 +41,7 @@ markets-ref-data/
 ```
 
 #### Setup & Execution
-1. **Prerequisites:** JDK 21, Maven, and Docker (for TimescaleDB).
+1. **Prerequisites:** JDK 25, Maven, and Docker (for TimescaleDB).
 2. **Run the test suite:**
    ```powershell
    cd markets-ref-data
@@ -73,3 +73,4 @@ markets-ref-data/
 * **Yahoo Finance's Crumb Requirement:** A plain request to Yahoo's unofficial `quoteSummary` endpoint 401s with "Invalid Crumb" — it now requires warming up a cookie, exchanging it for a crumb token, then including both on the actual request. This is a session-lifetime handshake (done once at startup), not per-request.
 * **Yahoo Finance Rate Limiting:** The same unofficial API throttles aggressively under repeated testing (`429`, with a plain-text `"Edge: Too Many Requests"` body rather than JSON) — worth handling defensively (check status before parsing) and pacing requests if refreshing many symbols.
 * **NSE vs. Fundamentals:** NSE's Bhavcopy/quote APIs carry price and trading-activity data only — no market cap, P/E, sector, or company description. Fundamentals require a separate source entirely (Yahoo Finance here).
+* **Spring Boot 4 is a major upgrade, not a patch bump:** moving from Spring Boot 3.3.4 to 4.1.1 (Java 21 → 25) pulled in real breaking changes — a restructured Flyway starter, self-managed Testcontainers versions, a Jackson 2→3 default switch, and `@WebMvcTest` now hard-requiring a Spring Security class on the classpath even for apps with no Security dependency. See `CLAUDE.md` for the specifics if touching dependencies.
