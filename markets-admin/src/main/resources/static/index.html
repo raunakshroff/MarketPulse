@@ -468,7 +468,7 @@
     host.innerHTML = services.map(s => {
       const health = (s.health || 'UNKNOWN').toLowerCase();
       const links = (s.links || []).map(l => `
-        <a class="lnk" href="${esc(l.url)}" title="${esc(l.description)}">
+        <a class="lnk" href="${esc(l.url)}" title="${esc(l.description)}" target="_blank" rel="noopener noreferrer">
           <span class="l">${esc(l.label)}</span>
           <span class="d">${esc(l.description)}</span>
           <span class="a">→</span>
