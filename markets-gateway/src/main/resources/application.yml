@@ -1,0 +1,24 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: markets-gateway
+
+# Same internal/external URL split convention as markets-admin's own registry, except here
+# there's only one consumer of these URLs: the gateway itself, proxying browser traffic.
+# docker-compose.yml overrides these to the compose DNS names; these localhost defaults are for
+# running the gateway standalone (mvn spring-boot:run) against the other services' own defaults.
+gateway:
+  admin-url: ${GATEWAY_ADMIN_URL:http://localhost:8083}
+  ui-url: ${GATEWAY_UI_URL:http://localhost:3000}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %-5level - %logger{36} - %msg%n"
