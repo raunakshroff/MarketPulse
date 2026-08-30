@@ -10,6 +10,7 @@ import com.marketpulse.refdata.model.DownloadResult;
 import com.marketpulse.refdata.repository.BackfillJobDateRepository;
 import com.marketpulse.refdata.repository.BackfillJobRepository;
 import com.marketpulse.refdata.repository.EquityPriceRepository;
+import java.time.Clock;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -49,17 +50,26 @@ public class BackfillService {
     private final BackfillJobDateRepository jobDateRepository;
     private final NseProperties properties;
 
+    /**
+     * Injected rather than calling {@code LocalDate.now()} directly, so the trust window below can
+     * be tested at a fixed "today". With the wall clock, whether a test can even construct a
+     * weekday inside that window depends on the day it runs.
+     */
+    private final Clock clock;
+
     public BackfillService(
             BhavcopyService bhavcopyService,
             EquityPriceRepository equityPriceRepository,
             BackfillJobRepository jobRepository,
             BackfillJobDateRepository jobDateRepository,
-            NseProperties properties) {
+            NseProperties properties,
+            Clock clock) {
         this.bhavcopyService = bhavcopyService;
         this.equityPriceRepository = equityPriceRepository;
         this.jobRepository = jobRepository;
         this.jobDateRepository = jobDateRepository;
         this.properties = properties;
+        this.clock = clock;
     }
 
     /** Every weekday in [from, to] inclusive. Weekends are never fetched - NSE publishes no file. */
@@ -212,7 +222,7 @@ public class BackfillService {
         Set<LocalDate> skip = new HashSet<>(
                 equityPriceRepository.findDistinctTradeDatesBetween(job.getFromDate(), job.getToDate()));
 
-        LocalDate trustedUpTo = LocalDate.now().minusDays(NOT_FOUND_TRUSTED_AFTER_DAYS);
+        LocalDate trustedUpTo = LocalDate.now(clock).minusDays(NOT_FOUND_TRUSTED_AFTER_DAYS);
         if (!trustedUpTo.isBefore(job.getFromDate())) {
             LocalDate holidayLookupTo = trustedUpTo.isBefore(job.getToDate()) ? trustedUpTo : job.getToDate();
             skip.addAll(jobDateRepository.findKnownNonTradingDates(job.getFromDate(), holidayLookupTo));

@@ -18,7 +18,9 @@ import com.marketpulse.refdata.model.DownloadResult;
 import com.marketpulse.refdata.repository.BackfillJobDateRepository;
 import com.marketpulse.refdata.repository.BackfillJobRepository;
 import com.marketpulse.refdata.repository.EquityPriceRepository;
+import java.time.Clock;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -37,6 +39,19 @@ class BackfillServiceTest {
     private NseProperties properties;
     private BackfillService service;
 
+    /**
+     * "Today" is pinned to Wednesday 2026-08-12 so the NOT_FOUND trust window is testable at all.
+     * The window only distrusts the last two days, so a test needs a weekday inside it - and on a
+     * real Sunday no such weekday exists, which used to make this suite fail one day in seven.
+     *
+     * <p>Chosen so the trust boundary lands on Monday 2026-08-10: every other date in this class
+     * (2026-08-03..10) stays on the trusted side of it, exactly as with the wall clock.
+     */
+    private static final LocalDate TODAY = LocalDate.of(2026, 8, 12);
+
+    private static final Clock TEST_CLOCK =
+            Clock.fixed(TODAY.atStartOfDay(ZoneOffset.UTC).toInstant(), ZoneOffset.UTC);
+
     @BeforeEach
     void setUp() {
         bhavcopyService = mock(BhavcopyService.class);
@@ -53,7 +68,7 @@ class BackfillServiceTest {
         when(jobDateRepository.findKnownNonTradingDates(any(), any())).thenReturn(List.of());
 
         service = new BackfillService(
-                bhavcopyService, equityPriceRepository, jobRepository, jobDateRepository, properties);
+                bhavcopyService, equityPriceRepository, jobRepository, jobDateRepository, properties, TEST_CLOCK);
     }
 
     /** Registers a PENDING job with the mocked repository and returns it. */
@@ -124,12 +139,10 @@ class BackfillServiceTest {
 
     @Test
     void aRecentNotFoundIsNotTrustedAsAHolidayYet() {
-        // Within the trust window: today's/yesterday's NOT_FOUND may just mean "not yet published".
-        LocalDate recent = LocalDate.now();
-        while (recent.getDayOfWeek() == java.time.DayOfWeek.SATURDAY
-                || recent.getDayOfWeek() == java.time.DayOfWeek.SUNDAY) {
-            recent = recent.minusDays(1);
-        }
+        // Tuesday, the day before the fixed today: inside the trust window, so a recorded
+        // NOT_FOUND may only mean "NSE has not published yet" and must be retried rather than
+        // cached as a holiday - caching it would leave a silent, permanent gap.
+        LocalDate recent = TODAY.minusDays(1);
         when(jobDateRepository.findKnownNonTradingDates(any(), any())).thenReturn(List.of(recent));
         when(bhavcopyService.downloadBhavcopy(recent))
                 .thenReturn(DownloadResult.success(recent, "equity_price", 2416));
@@ -138,6 +151,20 @@ class BackfillServiceTest {
         service.executeJob(job.getId());
 
         verify(bhavcopyService).downloadBhavcopy(recent);
+    }
+
+    @Test
+    void anOlderNotFoundIsTrustedAsAHoliday() {
+        // The other side of the same boundary: two days back is old enough to trust, so the
+        // recorded NOT_FOUND is honoured and the date is skipped rather than re-fetched.
+        LocalDate settled = TODAY.minusDays(2);
+        when(jobDateRepository.findKnownNonTradingDates(any(), any())).thenReturn(List.of(settled));
+        BackfillJob job = givenJob(settled, settled, false);
+
+        service.executeJob(job.getId());
+
+        verify(bhavcopyService, never()).downloadBhavcopy(settled);
+        assertThat(recordedDates().get(settled).getStatus()).isEqualTo(BackfillDateStatus.SKIPPED);
     }
 
     @Test
