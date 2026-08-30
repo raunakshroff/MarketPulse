@@ -7,13 +7,17 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="/strata-topbar.js"></script>
 <style>
   /* ------------------------------------------------------------------
      Ported from markets-ui/src/theme.css - the Strata theme is the UI
      standard for every MarketPulse page, backend-served ones included.
-     This service is a separate deployable and cannot import that file,
-     so the tokens and component classes it needs are copied verbatim.
-     Keep this in step when theme.css changes.
+     Design tokens (:root / [data-theme] / [data-accent]) and the topbar
+     itself (logo, theme toggle, accent picker, profile menu) now come
+     from the <strata-topbar> element loaded above - one shared
+     implementation instead of two hand-copied ones. What's left here is
+     purely this console's own content chrome (cards, tiles, service
+     list) - keep it in step with theme.css's non-topbar classes.
      ------------------------------------------------------------------ */
 
   * { box-sizing: border-box; }
@@ -25,44 +29,6 @@
     color: var(--text);
     font-family: 'Space Grotesk', sans-serif;
     -webkit-font-smoothing: antialiased;
-  }
-
-  :root {
-    --bg: #0a0a0c;
-    --surface: #141417;
-    --surface-2: #1c1c20;
-    --line: rgba(255, 255, 255, 0.07);
-    --line-strong: rgba(255, 255, 255, 0.13);
-    --text: #f3f1ec;
-    --muted: #a3a097;
-    --faint: #6c6961;
-    --accent: #d8b15f;
-    --accent-soft: rgba(216, 177, 95, 0.14);
-    --up: #56cf9b;
-    --down: #f0876a;
-    --up-soft: rgba(86, 207, 155, 0.12);
-    --down-soft: rgba(240, 135, 106, 0.12);
-    --shadow: 0 1px 0 rgba(255, 255, 255, 0.04), 0 24px 60px -34px rgba(0, 0, 0, 0.8);
-    --glow: rgba(216, 177, 95, 0.18);
-  }
-
-  [data-theme='light'] {
-    --bg: #f1eee7;
-    --surface: #ffffff;
-    --surface-2: #f9f7f1;
-    --line: rgba(20, 18, 14, 0.08);
-    --line-strong: rgba(20, 18, 14, 0.15);
-    --text: #171511;
-    --muted: #6c685f;
-    --faint: #a39e93;
-    --accent: #a9762b;
-    --accent-soft: rgba(169, 118, 43, 0.12);
-    --up: #138a5e;
-    --down: #cf5a34;
-    --up-soft: rgba(19, 138, 94, 0.1);
-    --down-soft: rgba(207, 90, 52, 0.1);
-    --shadow: 0 1px 0 rgba(255, 255, 255, 0.7), 0 26px 54px -36px rgba(40, 30, 10, 0.3);
-    --glow: rgba(169, 118, 43, 0.16);
   }
 
   @keyframes fadeUp {
@@ -109,42 +75,6 @@
     z-index: 0;
   }
 
-  .topbar {
-    position: sticky;
-    top: 0;
-    z-index: 40;
-    backdrop-filter: blur(18px);
-    background: color-mix(in srgb, var(--bg) 78%, transparent);
-    border-bottom: 1px solid var(--line);
-  }
-
-  .topbar-inner {
-    max-width: 1320px;
-    margin: 0 auto;
-    padding: 0 clamp(16px, 3vw, 32px);
-    height: 66px;
-    display: flex;
-    align-items: center;
-    gap: clamp(14px, 2.4vw, 32px);
-  }
-
-  .logo {
-    display: flex;
-    align-items: center;
-    gap: 11px;
-    cursor: pointer;
-    flex: none;
-    color: inherit;
-    text-decoration: none;
-  }
-
-  .logo-title {
-    font-family: 'Instrument Serif', serif;
-    font-size: 25px;
-    letter-spacing: 0.01em;
-    line-height: 1;
-  }
-
   .ticker-badge {
     border-radius: 10px;
     background: var(--accent-soft);
@@ -156,58 +86,6 @@
     color: var(--accent);
     flex: none;
   }
-
-  .icon-btn {
-    width: 40px;
-    height: 40px;
-    border-radius: 11px;
-    border: 1px solid var(--line);
-    background: var(--surface);
-    color: var(--text);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-  }
-
-  .icon-btn:hover { border-color: var(--line-strong); }
-
-  .avatar {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 40%, var(--text)));
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 600;
-    font-size: 14px;
-    color: var(--bg);
-    cursor: pointer;
-    flex: none;
-  }
-
-  .market-status {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    padding: 7px 12px;
-    border-radius: 10px;
-    background: var(--up-soft);
-    margin-right: 4px;
-  }
-
-  .market-status.degraded { background: var(--down-soft); }
-
-  .market-status-dot {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: var(--up);
-  }
-
-  .market-status.degraded .market-status-dot { background: var(--down); }
 
   .shell {
     position: relative;
@@ -467,30 +345,16 @@
 <body>
 <div class="app-bg-glow"></div>
 
-<header class="topbar">
-  <div class="topbar-inner">
-    <a class="logo" href="/">
-      <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true">
-        <g fill="var(--accent)">
-          <rect x="3" y="15.4" width="20" height="3.4" rx="1.7"></rect>
-          <rect x="6" y="9.7" width="14" height="3.4" rx="1.7" opacity=".62"></rect>
-          <rect x="9" y="4" width="8" height="3.4" rx="1.7" opacity=".38"></rect>
-        </g>
-      </svg>
-      <span class="logo-title">Strata</span>
-    </a>
-    <span class="pending-note" style="margin-left:0">admin console</span>
-
-    <nav style="display:flex;align-items:center;gap:6px;margin-left:auto;flex:none">
-      <div class="market-status" id="system-status">
-        <span class="market-status-dot"></span>
-        <span style="font-size:12px;font-weight:500" id="system-status-text">checking…</span>
-      </div>
-      <button class="icon-btn" id="theme-toggle" title="Toggle theme" type="button"></button>
-      <div class="avatar">A</div>
-    </nav>
-  </div>
-</header>
+<strata-topbar
+  id="topbar"
+  logo-href="http://localhost:3000"
+  badge="admin console"
+  status-label="checking…"
+  status-variant="up"
+  menu-label="Open Dashboard"
+  menu-href="http://localhost:3000"
+  avatar-initial="A"
+></strata-topbar>
 
 <div class="shell">
   <aside class="sidebar">
@@ -551,22 +415,9 @@
 </div>
 
 <script>
-  const SUN = '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">'
-    + '<circle cx="12" cy="12" r="4.2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8'
-    + 'M17.3 17.3l1.8 1.8M19.1 4.9l-1.8 1.8M6.7 17.3l-1.8 1.8"/></svg>';
-  const MOON = '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">'
-    + '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>';
-
-  // Matches markets-ui's ThemeContext: dark by default, toggled via data-theme on <html>.
-  const toggle = document.getElementById('theme-toggle');
-  function applyTheme(theme) {
-    document.documentElement.setAttribute('data-theme', theme);
-    toggle.innerHTML = theme === 'dark' ? MOON : SUN;
-  }
-  applyTheme('dark');
-  toggle.addEventListener('click', () => {
-    applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
-  });
+  // Theme/accent/dark-light state, the topbar itself, and its logo/profile-menu behavior all
+  // live in <strata-topbar> (loaded via the <script> tag in <head>) - nothing to wire up here.
+  const topbar = document.getElementById('topbar');
 
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => (
     { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]
@@ -595,11 +446,8 @@
         <div class="tile-value" style="font-size:14px">${esc(location.host)}</div>
       </div>`;
 
-    const status = document.getElementById('system-status');
-    status.classList.toggle('degraded', down > 0);
-    status.querySelector('span:last-child').style.color = down > 0 ? 'var(--down)' : 'var(--up)';
-    document.getElementById('system-status-text').textContent =
-      down > 0 ? `${down} service${down > 1 ? 's' : ''} down` : 'All systems up';
+    topbar.setAttribute('status-variant', down > 0 ? 'down' : 'up');
+    topbar.setAttribute('status-label', down > 0 ? `${down} service${down > 1 ? 's' : ''} down` : 'All systems up');
   }
 
   function renderSidebar(services) {
@@ -655,6 +503,15 @@
       const r = await fetch('/api/v1/admin/services', { headers: { accept: 'application/json' } });
       if (!r.ok) throw new Error('HTTP ' + r.status);
       const services = await r.json();
+      // The topbar's markup ships with the documented http://localhost:3000 default; once the
+      // registry loads, point it at markets-ui's actual configured external-url instead (e.g. a
+      // docker-compose ADMIN_MARKETS_UI_EXTERNAL_URL override), the same source of truth every
+      // other link on this page already uses.
+      const ui = services.find(s => s.id === 'markets-ui');
+      if (ui && ui.externalUrl) {
+        topbar.setAttribute('logo-href', ui.externalUrl);
+        topbar.setAttribute('menu-href', ui.externalUrl);
+      }
       renderTiles(services);
       renderSidebar(services);
       renderServices(services);
