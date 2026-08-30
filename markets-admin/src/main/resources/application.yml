@@ -1,0 +1,104 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: markets-admin
+  threads:
+    virtual:
+      enabled: true
+
+# ---------------------------------------------------------------------------
+# The service registry. This is the single place the console's contents live -
+# adding a future module (Watchlist, Portfolio, Alerts, News, Identity) to the
+# console is a new entry here, not a code change.
+#
+# Each service carries TWO base URLs, because the two consumers sit on opposite
+# sides of the network boundary:
+#   internal-url  this service probes it server-side, so under Docker it is the
+#                 compose service name; defaults below are for running locally.
+#   external-url  baked into the links a browser follows, so it must be an
+#                 address the operator's own machine can reach.
+# docker-compose.yml overrides the internal ones with compose DNS names.
+# ---------------------------------------------------------------------------
+admin:
+  refresh-on-load: true
+  services:
+    - id: markets-ref-data
+      name: markets-ref-data
+      role: Write / ingestion
+      description: >-
+        Fetches NSE Bhavcopy EOD prices and Yahoo Finance fundamentals into TimescaleDB.
+        Owns the database schema via Flyway, and runs the 19:00 IST weekday scheduler.
+      internal-url: ${ADMIN_REF_DATA_INTERNAL_URL:http://localhost:8081}
+      external-url: ${ADMIN_REF_DATA_EXTERNAL_URL:http://localhost:8081}
+      health-path: /actuator/health
+      links:
+        - label: Swagger UI
+          path: /swagger-ui.html
+          description: Browse and execute every endpoint on this service.
+        - label: OpenAPI document
+          path: /v3/api-docs
+          description: Raw OpenAPI 3 JSON for client generation.
+        - label: Health
+          path: /actuator/health
+          description: Liveness of the app and its database connection.
+        - label: Backfill job history
+          path: /api/v1/bhavcopy/backfill
+          description: The 50 most recent bulk-load jobs, newest first.
+
+    - id: stock-discovery
+      name: stock-discovery
+      role: Read / query
+      description: >-
+        Serves symbol search, price history and fundamentals to the UI from the same database.
+        Strictly read-only - no Flyway, ddl-auto none, so it can never alter the schema.
+      internal-url: ${ADMIN_STOCK_DISCOVERY_INTERNAL_URL:http://localhost:8082}
+      external-url: ${ADMIN_STOCK_DISCOVERY_EXTERNAL_URL:http://localhost:8082}
+      health-path: /actuator/health
+      links:
+        - label: Swagger UI
+          path: /swagger-ui.html
+          description: Browse and execute every endpoint on this service.
+        - label: OpenAPI document
+          path: /v3/api-docs
+          description: Raw OpenAPI 3 JSON for client generation.
+        - label: Health
+          path: /actuator/health
+          description: Liveness of the app and its database connection.
+        - label: Sample search
+          path: /api/v1/stocks/search?q=RELIANCE&limit=10
+          description: Exercise the read path end to end with a known symbol.
+
+    - id: markets-ui
+      name: markets-ui
+      role: Frontend
+      description: >-
+        The React single-page app operators and users actually look at, served by nginx.
+        Static only - it has no Actuator or Swagger of its own, so health is a plain page fetch.
+      internal-url: ${ADMIN_MARKETS_UI_INTERNAL_URL:http://localhost:3000}
+      external-url: ${ADMIN_MARKETS_UI_EXTERNAL_URL:http://localhost:3000}
+      health-path: /
+      links:
+        - label: Open the app
+          path: /
+          description: The dashboard as end users see it.
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+springdoc:
+  # Swagger UI at /swagger-ui.html, raw OpenAPI 3 JSON at /v3/api-docs.
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: alpha
+  api-docs:
+    path: /v3/api-docs
+
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %-5level - %logger{36} - %msg%n"

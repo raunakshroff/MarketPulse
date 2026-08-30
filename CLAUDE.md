@@ -8,6 +8,7 @@ MarketPulse is a multi-module project for enterprise/professional-level markets 
 - **`markets-ref-data`** — the write/ingestion side. A Spring Boot microservice that fetches daily NSE Bhavcopy EOD equity prices (on a schedule, on demand, or in bulk via the backfill API) and, on demand, company fundamentals from Yahoo Finance, persisting all of it to TimescaleDB. Owns the schema via Flyway.
 - **`stock-discovery`** — the read/query side. A read-only Spring Boot microservice against the same database (`ddl-auto: none`, no Flyway) exposing search/history/fundamentals APIs for the UI.
 - **`markets-ui`** — the frontend. A React + Vite + TypeScript app translated from the "Strata" design, calling `stock-discovery` for real data.
+- **`markets-admin`** — the operations console. A stateless Spring Boot microservice serving one admin page covering every service in the system, driven by a configured registry.
 
 Future modules (Watchlist, Portfolio, Alerts, News, Identity — per the project's event-storming diagram) are expected to live as further sibling directories.
 
@@ -150,6 +151,23 @@ This project was upgraded from Java 21 / Spring Boot 3.3.4 to **Java 25 / Spring
 - **`@WebMvcTest` moved** from `org.springframework.boot.test.autoconfigure.web.servlet` to `org.springframework.boot.webmvc.test.autoconfigure`, and its hard-coded auto-configuration import list references `org.springframework.boot.security.autoconfigure.SecurityAutoConfiguration` **by class name even when the project has zero Spring Security dependency** — the class must be on the (test) classpath or `@WebMvcTest` fails to load at all. This project adds `spring-boot-security` + `spring-security-test` as **test-scoped only** dependencies purely to satisfy that reference, then explicitly excludes the actual servlet security auto-configurations in each `@WebMvcTest` annotation (see Testing conventions above) so tests aren't forced through real HTTP Basic auth. The real, deployed app has no Spring Security on its runtime classpath at all — this is a test-only quirk of Spring Boot 4.1.1's module structure, not a production security posture change.
 - **`spring-boot-starter-test`** now excludes most test-slice support (`@WebMvcTest`, security test helpers, etc.) by default; this project uses **`spring-boot-starter-test-classic`** instead, which bundles the granular per-feature test modules back together for less migration churn.
 - **springdoc/Swagger**: both backend services use `springdoc-openapi-starter-webmvc-ui` **3.1.0**. The **3.x line is the Spring Boot 4 line** (its parent is `spring-boot-starter-parent` 4.1.0); the widely-referenced 2.x line targets Spring Boot 3 and will not work here. Version is pinned via a `<springdoc.version>` property in each pom since Spring Boot's dependency management doesn't cover springdoc. It coexists fine with this project's dual Jackson 2 + Jackson 3 classpath, and doesn't leak into the `@WebMvcTest` slices (springdoc's auto-configuration isn't in that slice's import list).
+
+### `markets-admin` operations console
+
+A **separate microservice** (port 8083) serving one console at `/` for the whole system, rather than an admin page embedded in each service. That split is the point: the console is a system-level view, and duplicating a page into every service would mean editing N services to add one link.
+
+1. **`config/AdminProperties.java`** — `@ConfigurationProperties(prefix = "admin")`, a record binding `admin.services` from `application.yml`. **This is the only place the console's contents are configured** — adding a future module to the console is a YAML entry, not a code change, and nothing is added to the service being listed.
+2. **`service/ServiceStatusService.java`** — reads the registry and enriches each entry with a live health probe. Probes run **in parallel** (`CompletableFuture`): with a per-probe timeout, checking serially would make page load the *sum* of every unreachable service's timeout — exactly the situation the console exists to report on.
+3. **`controller/AdminController.java`** — `GET /api/v1/admin/services`, `GET /api/v1/admin/services/{id}`. The list endpoint is **always 200**; a dead service is a `DOWN` entry in the payload, not an error on the call.
+4. **`static/index.html`** — the console, rendered from that API. No build step and no external dependencies: the Strata palette is inlined and fonts are system stacks, so it renders with no network access.
+
+**Each service carries two URLs, and they are not interchangeable.** `internal-url` is what `markets-admin` probes server-side, so under Docker it is the compose DNS name (`http://stock-discovery:8082`); `external-url` is baked into the links a browser follows, so it must be host-reachable (`http://localhost:8082`). Collapsing them breaks whichever consumer is on the far side — the compose file overrides only the internal ones.
+
+**Why probing is server-side:** the browser cannot resolve compose-internal hostnames, and fetching other services cross-origin from the console page would be blocked by CORS. The probe belongs on the server for both reasons.
+
+Health classification is deliberately tolerant of non-Actuator services: a parseable `status` field wins over the HTTP code (Actuator answers `503` with a `DOWN` body), and a plain 2xx with no JSON counts as UP — which is how `markets-ui`, static nginx with no Actuator, is covered at all. Connect timeouts and response timeouts are reported distinctly, since they fire on different clocks and have different fixes.
+
+**This service has no database and no `depends_on`**, deliberately: it must start and report on the others precisely when they are broken.
 
 ### API documentation (Swagger / OpenAPI)
 

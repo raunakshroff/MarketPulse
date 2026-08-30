@@ -6,6 +6,7 @@ MarketPulse is a multi-module project, split CQRS-style across the write and rea
 - **`markets-ref-data`** — the write/ingestion side. Fetches data from external sources (NSE, Yahoo Finance) and owns the TimescaleDB schema via Flyway.
 - **`stock-discovery`** — the read/query side. A read-only microservice against the same database (no Flyway, `ddl-auto: none`) that exposes search and lookup APIs for the UI.
 - **`markets-ui`** — the frontend. A React + Vite + TypeScript app (translated from the "Strata" design) that calls `stock-discovery` for real search/price/fundamentals data.
+- **`markets-admin`** — the operations console. A stateless microservice serving one admin page for the whole system, with a live server-side health probe of every other service.
 
 Future modules (Watchlist, Portfolio, Alerts, News, Identity — per the project's event-storming diagram) are expected to live as further sibling directories.
 
@@ -142,8 +143,33 @@ npm run dev     # needs stock-discovery reachable at the URL in .env (VITE_API_B
 npm run build   # production build, output in dist/
 ```
 
+### Module: `markets-admin`
+The operations console for the whole system — a stateless Spring Boot microservice (port 8083) serving one admin page at `/` covering every other service, rather than a separate admin page bolted onto each one.
+
+**Key Features:**
+- **One console for the system:** each service is shown as a card with its role, description, live health and its operational links (Swagger, OpenAPI, Actuator, and service-specific entries like backfill job history).
+- **Config-driven registry:** the list of services lives entirely in this module's `application.yml` under `admin.services`. Adding a future module to the console is a YAML entry — no code change, and nothing to add to the service being listed.
+- **Server-side health probes:** the console probes each service itself rather than from the browser, because the browser cannot resolve compose-internal hostnames and cross-origin fetches would be blocked by CORS. Probes run in parallel with a short timeout, so one dead service cannot stall the page.
+- **Tolerant health classification:** an Actuator `status` body wins over the HTTP code, while a plain 2xx with no JSON still counts as UP — which is how the static `markets-ui` is covered despite having no Actuator.
+- **No database, no `depends_on`:** deliberately stateless so it can start and report on the others precisely when they are broken.
+
+#### REST API
+- `GET /api/v1/admin/services` — the configured registry, each entry with a freshly probed health. Always `200`; an unreachable service is a `DOWN` entry in the payload, not an error on the call.
+- `GET /api/v1/admin/services/{id}` — the same payload for one configured service id; `404` if no such id is configured.
+- `GET /actuator/health` — this service's own health check.
+- **`GET /`** — the console itself ([localhost:8083](http://localhost:8083)).
+- **`GET /swagger-ui.html`** — Swagger UI; raw OpenAPI 3 document at `/v3/api-docs`.
+
+#### Setup & Execution
+```powershell
+cd markets-admin
+mvn test
+mvn spring-boot:run   # no database needed; probes default to localhost ports
+```
+Running under Docker, compose overrides the probe targets with compose DNS names. Each service is configured with **two** URLs: an `internal-url` this service probes over the container network, and an `external-url` baked into the links your browser follows. They are not interchangeable — collapsing them breaks whichever consumer is on the far side.
+
 ## Running everything together
-From the repo root, `docker-compose.yml` brings up all four services — `timescaledb`, `markets-ref-data` (port 8081), `stock-discovery` (port 8082), and `markets-ui` (port 3000, served via nginx) — wired together with the correct dependency order (`markets-ref-data`/`stock-discovery` wait on TimescaleDB's healthcheck; `markets-ui` waits on `stock-discovery`):
+From the repo root, `docker-compose.yml` brings up all five services — `timescaledb`, `markets-ref-data` (port 8081), `stock-discovery` (port 8082), `markets-ui` (port 3000, served via nginx) and `markets-admin` (port 8083) — wired together with the correct dependency order (`markets-ref-data`/`stock-discovery` wait on TimescaleDB's healthcheck; `markets-ui` waits on `stock-discovery`; `markets-admin` waits on nothing, so it can start and report on the others when they are broken):
 ```powershell
 docker compose up -d --build
 ```
@@ -152,6 +178,7 @@ docker compose up -d --build
 Once up:
 | | |
 |---|---|
+| **Admin console** | **[localhost:8083](http://localhost:8083)** |
 | UI | [localhost:3000](http://localhost:3000) |
 | `markets-ref-data` Swagger | [localhost:8081/swagger-ui.html](http://localhost:8081/swagger-ui.html) |
 | `stock-discovery` Swagger | [localhost:8082/swagger-ui.html](http://localhost:8082/swagger-ui.html) |
