@@ -212,7 +212,7 @@ export class StrataTopbar extends HTMLElement {
     return `
       <div class="backdrop" id="profile-backdrop"></div>
       <div class="profile-popover">
-        <a class="profile-menu-item" id="menu-link" href="${esc(target)}" target="_blank" rel="noopener noreferrer">
+        <a class="profile-menu-item" id="menu-link" href="${esc(target)}">
           ${LINK_ICON}${esc(label)}
         </a>
       </div>
@@ -306,15 +306,6 @@ export class StrataTopbar extends HTMLElement {
     this.root.getElementById('profile-backdrop')?.addEventListener('click', () => {
       this.profileOpen = false;
       this.render();
-    });
-
-    this.root.getElementById('menu-link')?.addEventListener('click', () => {
-      // Deferred: re-rendering synchronously would remove this <a> mid-click, before the
-      // browser has resolved its target="_blank" navigation.
-      setTimeout(() => {
-        this.profileOpen = false;
-        this.render();
-      }, 0);
     });
   }
 }
