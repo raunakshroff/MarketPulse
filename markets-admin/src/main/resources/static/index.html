@@ -1,0 +1,675 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Strata · Admin Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* ------------------------------------------------------------------
+     Ported from markets-ui/src/theme.css - the Strata theme is the UI
+     standard for every MarketPulse page, backend-served ones included.
+     This service is a separate deployable and cannot import that file,
+     so the tokens and component classes it needs are copied verbatim.
+     Keep this in step when theme.css changes.
+     ------------------------------------------------------------------ */
+
+  * { box-sizing: border-box; }
+
+  html, body { margin: 0; padding: 0; min-height: 100vh; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Space Grotesk', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  :root {
+    --bg: #0a0a0c;
+    --surface: #141417;
+    --surface-2: #1c1c20;
+    --line: rgba(255, 255, 255, 0.07);
+    --line-strong: rgba(255, 255, 255, 0.13);
+    --text: #f3f1ec;
+    --muted: #a3a097;
+    --faint: #6c6961;
+    --accent: #d8b15f;
+    --accent-soft: rgba(216, 177, 95, 0.14);
+    --up: #56cf9b;
+    --down: #f0876a;
+    --up-soft: rgba(86, 207, 155, 0.12);
+    --down-soft: rgba(240, 135, 106, 0.12);
+    --shadow: 0 1px 0 rgba(255, 255, 255, 0.04), 0 24px 60px -34px rgba(0, 0, 0, 0.8);
+    --glow: rgba(216, 177, 95, 0.18);
+  }
+
+  [data-theme='light'] {
+    --bg: #f1eee7;
+    --surface: #ffffff;
+    --surface-2: #f9f7f1;
+    --line: rgba(20, 18, 14, 0.08);
+    --line-strong: rgba(20, 18, 14, 0.15);
+    --text: #171511;
+    --muted: #6c685f;
+    --faint: #a39e93;
+    --accent: #a9762b;
+    --accent-soft: rgba(169, 118, 43, 0.12);
+    --up: #138a5e;
+    --down: #cf5a34;
+    --up-soft: rgba(19, 138, 94, 0.1);
+    --down-soft: rgba(207, 90, 52, 0.1);
+    --shadow: 0 1px 0 rgba(255, 255, 255, 0.7), 0 26px 54px -36px rgba(40, 30, 10, 0.3);
+    --glow: rgba(169, 118, 43, 0.16);
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(14px); }
+    to { opacity: 1; transform: none; }
+  }
+
+  @keyframes pulseDot {
+    0% { transform: scale(1); opacity: 0.9; }
+    70% { transform: scale(2.6); opacity: 0; }
+    100% { opacity: 0; }
+  }
+
+  @media (max-width: 900px) {
+    .sidebar { display: none !important; }
+  }
+
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb {
+    background: var(--line-strong);
+    border-radius: 8px;
+    border: 3px solid transparent;
+    background-clip: padding-box;
+  }
+
+  .font-serif { font-family: 'Instrument Serif', serif; }
+  .font-mono { font-family: 'JetBrains Mono', monospace; }
+  .up { color: var(--up); }
+  .down { color: var(--down); }
+  .text-right { text-align: right; }
+
+  /* ---------- layout shell ---------- */
+
+  .app-bg-glow {
+    position: fixed;
+    top: -160px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 1100px;
+    height: 560px;
+    background: radial-gradient(ellipse at center, var(--glow), transparent 68%);
+    pointer-events: none;
+    filter: blur(20px);
+    z-index: 0;
+  }
+
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    backdrop-filter: blur(18px);
+    background: color-mix(in srgb, var(--bg) 78%, transparent);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .topbar-inner {
+    max-width: 1320px;
+    margin: 0 auto;
+    padding: 0 clamp(16px, 3vw, 32px);
+    height: 66px;
+    display: flex;
+    align-items: center;
+    gap: clamp(14px, 2.4vw, 32px);
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    cursor: pointer;
+    flex: none;
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .logo-title {
+    font-family: 'Instrument Serif', serif;
+    font-size: 25px;
+    letter-spacing: 0.01em;
+    line-height: 1;
+  }
+
+  .ticker-badge {
+    border-radius: 10px;
+    background: var(--accent-soft);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    color: var(--accent);
+    flex: none;
+  }
+
+  .icon-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 11px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--text);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+
+  .icon-btn:hover { border-color: var(--line-strong); }
+
+  .avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 40%, var(--text)));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--bg);
+    cursor: pointer;
+    flex: none;
+  }
+
+  .market-status {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 7px 12px;
+    border-radius: 10px;
+    background: var(--up-soft);
+    margin-right: 4px;
+  }
+
+  .market-status.degraded { background: var(--down-soft); }
+
+  .market-status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--up);
+  }
+
+  .market-status.degraded .market-status-dot { background: var(--down); }
+
+  .shell {
+    position: relative;
+    z-index: 1;
+    max-width: 1560px;
+    margin: 0 auto;
+    display: flex;
+    align-items: flex-start;
+  }
+
+  .sidebar {
+    flex: none;
+    width: 236px;
+    position: sticky;
+    top: 66px;
+    min-height: calc(100vh - 66px);
+    border-right: 1px solid var(--line);
+    padding: 18px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .sidebar-group { display: flex; flex-direction: column; gap: 3px; }
+
+  .sidebar-label {
+    font-size: 10.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--faint);
+    padding: 0 12px 8px;
+  }
+
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 11px;
+    cursor: pointer;
+    font-size: 13.5px;
+    font-weight: 500;
+    color: var(--faint);
+    background: transparent;
+    border: 1px solid transparent;
+    text-decoration: none;
+  }
+
+  .nav-item:hover { color: var(--text); }
+
+  .nav-item.active {
+    font-weight: 600;
+    color: var(--text);
+    background: var(--surface-2);
+    border-color: var(--line-strong);
+  }
+
+  .nav-pill {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10.5px;
+    padding: 2px 7px;
+    border-radius: 20px;
+    flex: none;
+    margin-left: auto;
+    color: var(--faint);
+    background: var(--surface-2);
+  }
+
+  .nav-pill.up { color: var(--up); background: var(--up-soft); }
+  .nav-pill.down { color: var(--down); background: var(--down-soft); }
+
+  .sidebar-card {
+    margin-top: auto;
+    padding: 15px 14px;
+    border: 1px solid var(--line);
+    border-radius: 15px;
+    background: var(--surface);
+  }
+
+  main.content {
+    flex: 1;
+    min-width: 0;
+    padding: clamp(20px, 3vw, 36px) clamp(16px, 3vw, 32px) 80px;
+  }
+
+  /* ---------- shared card components ---------- */
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    box-shadow: var(--shadow);
+    padding: 20px 22px;
+  }
+
+  .card-title {
+    margin: 0 0 14px;
+    font-family: 'Instrument Serif', serif;
+    font-size: 22px;
+    font-weight: 400;
+  }
+
+  .stat-tile {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 15px 17px;
+  }
+
+  .section-title {
+    margin: 0;
+    font-family: 'Instrument Serif', serif;
+    font-size: clamp(30px, 4vw, 42px);
+    font-weight: 400;
+    line-height: 1;
+  }
+
+  .pending-note {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11.5px;
+    color: var(--faint);
+    border: 1px dashed var(--line-strong);
+    border-radius: 8px;
+    padding: 4px 9px;
+    margin-left: 10px;
+  }
+
+  .btn-secondary {
+    height: 40px;
+    padding: 0 18px;
+    border-radius: 13px;
+    border: 1px solid var(--line-strong);
+    background: var(--surface);
+    color: var(--text);
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .btn-secondary:hover { border-color: var(--accent); }
+  .btn-secondary[disabled] { opacity: .55; cursor: progress; }
+
+  /* ---------- console-specific, built from the shared vocabulary ---------- */
+
+  .page-head {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 18px;
+    align-items: flex-end;
+    justify-content: space-between;
+    margin-bottom: 26px;
+  }
+
+  .page-sub {
+    margin: 10px 0 0;
+    color: var(--muted);
+    font-size: 14px;
+    max-width: 66ch;
+  }
+
+  .tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 14px;
+    margin-bottom: 26px;
+  }
+
+  .tile-label {
+    font-size: 11px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+
+  .tile-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 20px;
+    margin-top: 8px;
+  }
+
+  .services { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 18px; }
+
+  .svc { display: flex; flex-direction: column; animation: fadeUp .22s ease both; }
+  .svc-top { display: flex; align-items: flex-start; gap: 13px; }
+  .svc-name { font-family: 'Instrument Serif', serif; font-size: 23px; line-height: 1.1; }
+  .svc-role { margin-top: 4px; font-size: 10.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--faint); }
+  .svc-desc { margin-top: 13px; font-size: 13px; color: var(--muted); flex: 1; }
+
+  .status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 12px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    margin-left: auto;
+    flex: none;
+    background: var(--surface-2);
+    color: var(--muted);
+  }
+  .status-pill.up { background: var(--up-soft); color: var(--up); }
+  .status-pill.down { background: var(--down-soft); color: var(--down); }
+  .status-pill.unknown { background: var(--accent-soft); color: var(--accent); }
+
+  .status-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex: none; position: relative; }
+  .status-pill.up .status-dot::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: currentColor;
+    animation: pulseDot 2.4s ease-out infinite;
+  }
+
+  .probe-line {
+    margin-top: 14px;
+    padding-top: 13px;
+    border-top: 1px solid var(--line);
+    display: flex;
+    gap: 9px;
+    flex-wrap: wrap;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--faint);
+  }
+
+  .links { margin-top: 12px; display: flex; flex-direction: column; }
+
+  .lnk {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 9px 11px;
+    margin: 0 -11px;
+    border-radius: 11px;
+    text-decoration: none;
+    color: inherit;
+    border: 1px solid transparent;
+  }
+  .lnk:hover { background: var(--surface-2); border-color: var(--line-strong); }
+  .lnk .l { font-size: 13.5px; font-weight: 500; white-space: nowrap; }
+  .lnk .d { font-size: 12px; color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lnk .a { margin-left: auto; color: var(--accent); flex: none; }
+
+  .empty { color: var(--muted); font-size: 13.5px; }
+</style>
+</head>
+<body>
+<div class="app-bg-glow"></div>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="logo" href="/">
+      <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true">
+        <g fill="var(--accent)">
+          <rect x="3" y="15.4" width="20" height="3.4" rx="1.7"></rect>
+          <rect x="6" y="9.7" width="14" height="3.4" rx="1.7" opacity=".62"></rect>
+          <rect x="9" y="4" width="8" height="3.4" rx="1.7" opacity=".38"></rect>
+        </g>
+      </svg>
+      <span class="logo-title">Strata</span>
+    </a>
+    <span class="pending-note" style="margin-left:0">admin console</span>
+
+    <nav style="display:flex;align-items:center;gap:6px;margin-left:auto;flex:none">
+      <div class="market-status" id="system-status">
+        <span class="market-status-dot"></span>
+        <span style="font-size:12px;font-weight:500" id="system-status-text">checking…</span>
+      </div>
+      <button class="icon-btn" id="theme-toggle" title="Toggle theme" type="button"></button>
+      <div class="avatar">A</div>
+    </nav>
+  </div>
+</header>
+
+<div class="shell">
+  <aside class="sidebar">
+    <div class="sidebar-group">
+      <div class="sidebar-label">Services</div>
+      <div id="side-nav"></div>
+    </div>
+    <div class="sidebar-card">
+      <div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)">Probed by</div>
+      <div class="font-mono" style="font-size:13px;margin-top:7px;color:var(--muted)">markets-admin · 8083</div>
+      <div style="font-size:11.5px;margin-top:9px;color:var(--faint);line-height:1.5">
+        Health is checked server-side, so it works across the container network.
+      </div>
+    </div>
+  </aside>
+
+  <main class="content">
+    <div class="page-head">
+      <div>
+        <h1 class="section-title">Admin Console</h1>
+        <p class="page-sub">
+          Operational entry point for every service in the system — health, API documentation
+          and the maintenance links for each one.
+        </p>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <span class="font-mono" style="font-size:11.5px;color:var(--faint)" id="stamp">—</span>
+        <button class="btn-secondary" id="refresh" type="button">Refresh</button>
+      </div>
+    </div>
+
+    <div class="tiles" id="tiles"></div>
+
+    <h2 class="card-title" style="font-size:26px">Services</h2>
+    <div class="services" id="services">
+      <div class="card empty">Loading services…</div>
+    </div>
+
+    <div class="card" style="margin-top:22px">
+      <h2 class="card-title">Notes</h2>
+      <div style="font-size:12.5px;color:var(--muted);line-height:1.65">
+        <p style="margin:0 0 10px">
+          <b style="color:var(--text)">No authentication.</b> None of these services run Spring
+          Security, so this console and everything it links to are reachable by anyone who can
+          reach the port. Fine for local and trusted-network use; put authentication in front of
+          it before exposing it publicly.
+        </p>
+        <p style="margin:0">
+          <b style="color:var(--text)">Adding a service.</b> The registry lives in
+          <span class="font-mono">markets-admin</span>'s
+          <span class="font-mono">application.yml</span> under
+          <span class="font-mono">admin.services</span>. A new module appears here by adding an
+          entry there — no code change, and nothing to add to the service being listed.
+        </p>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+  const SUN = '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">'
+    + '<circle cx="12" cy="12" r="4.2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8'
+    + 'M17.3 17.3l1.8 1.8M19.1 4.9l-1.8 1.8M6.7 17.3l-1.8 1.8"/></svg>';
+  const MOON = '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">'
+    + '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>';
+
+  // Matches markets-ui's ThemeContext: dark by default, toggled via data-theme on <html>.
+  const toggle = document.getElementById('theme-toggle');
+  function applyTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    toggle.innerHTML = theme === 'dark' ? MOON : SUN;
+  }
+  applyTheme('dark');
+  toggle.addEventListener('click', () => {
+    applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+  });
+
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => (
+    { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]
+  ));
+  const initials = name => name.replace(/[^a-z]/gi, '').slice(0, 2).toUpperCase();
+
+  function renderTiles(services) {
+    const up = services.filter(s => s.health === 'UP').length;
+    const down = services.filter(s => s.health === 'DOWN').length;
+    const slowest = services.reduce((m, s) => Math.max(m, s.latencyMs ?? 0), 0);
+    document.getElementById('tiles').innerHTML = `
+      <div class="stat-tile">
+        <div class="tile-label">Services up</div>
+        <div class="tile-value ${down ? 'down' : 'up'}">${up}<span style="color:var(--faint)">/${services.length}</span></div>
+      </div>
+      <div class="stat-tile">
+        <div class="tile-label">Degraded</div>
+        <div class="tile-value ${down ? 'down' : ''}">${down}</div>
+      </div>
+      <div class="stat-tile">
+        <div class="tile-label">Slowest probe</div>
+        <div class="tile-value">${slowest}<span style="font-size:13px;color:var(--faint)"> ms</span></div>
+      </div>
+      <div class="stat-tile">
+        <div class="tile-label">Console host</div>
+        <div class="tile-value" style="font-size:14px">${esc(location.host)}</div>
+      </div>`;
+
+    const status = document.getElementById('system-status');
+    status.classList.toggle('degraded', down > 0);
+    status.querySelector('span:last-child').style.color = down > 0 ? 'var(--down)' : 'var(--up)';
+    document.getElementById('system-status-text').textContent =
+      down > 0 ? `${down} service${down > 1 ? 's' : ''} down` : 'All systems up';
+  }
+
+  function renderSidebar(services) {
+    document.getElementById('side-nav').innerHTML = services.map(s => `
+      <a class="nav-item" href="#svc-${esc(s.id)}">
+        ${esc(s.name)}
+        <span class="nav-pill ${s.health === 'UP' ? 'up' : 'down'}">${esc(s.health)}</span>
+      </a>`).join('');
+  }
+
+  function renderServices(services) {
+    const host = document.getElementById('services');
+    if (!services.length) {
+      host.innerHTML = '<div class="card empty">No services configured. Add entries under '
+        + '<span class="font-mono">admin.services</span> in markets-admin\'s application.yml.</div>';
+      return;
+    }
+    host.innerHTML = services.map(s => {
+      const health = (s.health || 'UNKNOWN').toLowerCase();
+      const links = (s.links || []).map(l => `
+        <a class="lnk" href="${esc(l.url)}" title="${esc(l.description)}">
+          <span class="l">${esc(l.label)}</span>
+          <span class="d">${esc(l.description)}</span>
+          <span class="a">→</span>
+        </a>`).join('');
+      return `
+        <div class="card svc" id="svc-${esc(s.id)}">
+          <div class="svc-top">
+            <div class="ticker-badge" style="width:42px;height:42px;font-size:12px">${esc(initials(s.name))}</div>
+            <div style="min-width:0">
+              <div class="svc-name">${esc(s.name)}</div>
+              <div class="svc-role">${esc(s.role)}</div>
+            </div>
+            <span class="status-pill ${health}"><span class="status-dot"></span>${esc(s.health)}</span>
+          </div>
+          <div class="svc-desc">${esc(s.description)}</div>
+          <div class="probe-line">
+            <span>${esc(s.detail)}</span><span>·</span>
+            <span>${s.latencyMs} ms</span><span>·</span>
+            <span>${esc(s.externalUrl)}</span>
+          </div>
+          <div class="links">${links}</div>
+        </div>`;
+    }).join('');
+  }
+
+  async function load() {
+    const button = document.getElementById('refresh');
+    const stamp = document.getElementById('stamp');
+    button.disabled = true;
+    stamp.textContent = 'probing…';
+    try {
+      const r = await fetch('/api/v1/admin/services', { headers: { accept: 'application/json' } });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const services = await r.json();
+      renderTiles(services);
+      renderSidebar(services);
+      renderServices(services);
+      stamp.textContent = 'checked ' + new Date().toLocaleTimeString();
+    } catch (e) {
+      document.getElementById('services').innerHTML =
+        '<div class="card empty">Could not load the service registry: ' + esc(e.message) + '</div>';
+      stamp.textContent = 'failed';
+    } finally {
+      button.disabled = false;
+    }
+  }
+
+  document.getElementById('refresh').addEventListener('click', load);
+  load();
+</script>
+</body>
+</html>

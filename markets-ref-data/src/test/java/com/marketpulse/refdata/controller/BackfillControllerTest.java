@@ -13,7 +13,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.marketpulse.refdata.config.NseProperties;
 import com.marketpulse.refdata.entity.BackfillJob;
 import com.marketpulse.refdata.service.BackfillService;
+import java.time.Clock;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -41,6 +43,12 @@ import org.springframework.test.web.servlet.MockMvc;
         })
 class BackfillControllerTest {
 
+    /**
+     * "Today" for this slice. Pinned so the future-date guard can be tested at all - with the wall
+     * clock there is no date that is reliably "tomorrow" from the test's point of view.
+     */
+    private static final LocalDate TODAY = LocalDate.of(2026, 8, 12);
+
     @TestConfiguration
     static class Config {
         // RefDataApplication's class-level @EnableConfigurationProperties(NseProperties.class)
@@ -50,6 +58,13 @@ class BackfillControllerTest {
         @Primary
         NseProperties nseProperties() {
             return new NseProperties();
+        }
+
+        // ClockConfig is a plain @Configuration, so @WebMvcTest does not load it - the controller
+        // needs a Clock supplied here or the slice cannot construct it.
+        @Bean
+        Clock clock() {
+            return Clock.fixed(TODAY.atStartOfDay(ZoneOffset.UTC).toInstant(), ZoneOffset.UTC);
         }
     }
 
@@ -137,5 +152,28 @@ class BackfillControllerTest {
 
         mockMvc.perform(get("/api/v1/bhavcopy/backfill"))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void acceptsARangeEndingToday() throws Exception {
+        BackfillJob job = new BackfillJob(TODAY, TODAY, false, 1);
+        when(backfillService.createJob(any(), any(), anyBoolean())).thenReturn(job);
+
+        mockMvc.perform(post("/api/v1/bhavcopy/backfill")
+                        .param("from", TODAY.toString())
+                        .param("to", TODAY.toString()))
+                .andExpect(status().isAccepted());
+    }
+
+    @Test
+    void rejectsARangeEndingTomorrow() throws Exception {
+        // The exact boundary. rejectsRangeEndingInTheFuture uses a far-future date, which passes
+        // under any clock and so never pins where "future" actually starts; the fixed clock does.
+        mockMvc.perform(post("/api/v1/bhavcopy/backfill")
+                        .param("from", TODAY.toString())
+                        .param("to", TODAY.plusDays(1).toString()))
+                .andExpect(status().isBadRequest());
+
+        verify(backfillService, never()).createJob(any(), any(), anyBoolean());
     }
 }

@@ -60,6 +60,27 @@ services:
     depends_on:
       - stock-discovery
 
+  markets-admin:
+    build: ./markets-admin
+    image: markets-admin:latest
+    container_name: markets-admin
+    restart: unless-stopped
+    ports:
+      - "8083:8083"
+    environment:
+      TZ: Asia/Kolkata
+      # Two URLs per service, because the two consumers are on opposite sides of the
+      # network: markets-admin probes health over the compose network, while the links
+      # it renders are followed by a browser on the host.
+      ADMIN_REF_DATA_INTERNAL_URL: http://markets-ref-data:8081
+      ADMIN_REF_DATA_EXTERNAL_URL: http://localhost:8081
+      ADMIN_STOCK_DISCOVERY_INTERNAL_URL: http://stock-discovery:8082
+      ADMIN_STOCK_DISCOVERY_EXTERNAL_URL: http://localhost:8082
+      ADMIN_MARKETS_UI_INTERNAL_URL: http://markets-ui:80
+      ADMIN_MARKETS_UI_EXTERNAL_URL: http://localhost:3000
+    # Deliberately no depends_on and no database: the console must be able to start and
+    # report on the others precisely when they are broken.
+
 volumes:
   timescaledb-data:
     external: true

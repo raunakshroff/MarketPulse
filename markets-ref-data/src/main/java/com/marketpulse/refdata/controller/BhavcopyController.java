@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
 import org.springframework.dao.DataAccessException;
@@ -26,9 +27,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class BhavcopyController {
 
     private final BhavcopyService bhavcopyService;
+    private final Clock clock;
 
-    public BhavcopyController(BhavcopyService bhavcopyService) {
+    public BhavcopyController(BhavcopyService bhavcopyService, Clock clock) {
         this.bhavcopyService = bhavcopyService;
+        this.clock = clock;
     }
 
     /** Triggers a download for the given date (defaults to today, or the last weekday if today is a weekend). */
@@ -51,7 +54,7 @@ public class BhavcopyController {
             @Parameter(description = "Trade date to download. Defaults to today, or the preceding Friday on a weekend.",
                     example = "2026-08-28")
             @RequestParam(required = false) LocalDate date) {
-        LocalDate targetDate = date != null ? date : lastWeekday(LocalDate.now());
+        LocalDate targetDate = date != null ? date : lastWeekday(LocalDate.now(clock));
         DownloadResult result = bhavcopyService.downloadBhavcopy(targetDate);
         return switch (result.status()) {
             case SUCCESS -> ResponseEntity.ok(result);
