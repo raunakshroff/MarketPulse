@@ -5,6 +5,7 @@ import com.marketpulse.refdata.entity.BackfillJob;
 import com.marketpulse.refdata.model.BackfillErrorResponse;
 import com.marketpulse.refdata.model.BackfillJobResponse;
 import com.marketpulse.refdata.service.BackfillService;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -25,10 +26,12 @@ public class BackfillController {
 
     private final BackfillService backfillService;
     private final NseProperties properties;
+    private final Clock clock;
 
-    public BackfillController(BackfillService backfillService, NseProperties properties) {
+    public BackfillController(BackfillService backfillService, NseProperties properties, Clock clock) {
         this.backfillService = backfillService;
         this.properties = properties;
+        this.clock = clock;
     }
 
     /** Queues a backfill over [from, to]. Returns 202 immediately; the walk runs in the background. */
@@ -42,7 +45,7 @@ public class BackfillController {
         if (from.isAfter(to)) {
             return badRequest("'from' (" + from + ") must not be after 'to' (" + to + ")");
         }
-        if (to.isAfter(LocalDate.now())) {
+        if (to.isAfter(LocalDate.now(clock))) {
             return badRequest("'to' (" + to + ") must not be in the future");
         }
         if (from.isBefore(earliest)) {
