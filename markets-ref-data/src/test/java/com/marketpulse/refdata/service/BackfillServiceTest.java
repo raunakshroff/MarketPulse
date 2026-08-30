@@ -69,6 +69,7 @@ class BackfillServiceTest {
         ArgumentCaptor<BackfillJobDate> captor = ArgumentCaptor.forClass(BackfillJobDate.class);
         verify(jobDateRepository, org.mockito.Mockito.atLeast(0)).save(captor.capture());
         return captor.getAllValues().stream()
+                .filter(java.util.Objects::nonNull)
                 .collect(Collectors.toMap(BackfillJobDate::getTradeDate, Function.identity()));
     }
 

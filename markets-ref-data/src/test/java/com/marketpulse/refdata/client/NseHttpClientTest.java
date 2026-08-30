@@ -43,7 +43,7 @@ class NseHttpClientTest {
     @SuppressWarnings("unchecked")
     void initializesSessionByHittingBaseUrl() throws Exception {
         when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
-                .thenReturn((HttpResponse) initResponse);
+                .thenReturn((HttpResponse<?>) initResponse);
 
         new NseHttpClient(httpClient, properties);
 

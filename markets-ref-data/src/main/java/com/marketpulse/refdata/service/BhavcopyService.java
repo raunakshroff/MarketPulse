@@ -61,7 +61,8 @@ public class BhavcopyService {
             byte[] filtered = EquityCsvFilter.filterEquityRows(content);
             List<EquityPrice> rows = parseToEntities(filtered, date);
 
-            equitySymbolRepository.upsertAll(rows.stream().map(EquityPrice::getSymbol).distinct().toList(), date);
+            equitySymbolRepository.upsertAll(
+                    rows.stream().map(equityPrice -> equityPrice.getSymbol()).distinct().toList(), date);
             equityPriceRepository.upsertAll(rows);
 
             log.info("Success! Saved {} equity rows for {} to equity_price", rows.size(), date);
