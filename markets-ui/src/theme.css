@@ -19,43 +19,10 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-:root {
-  --bg: #0a0a0c;
-  --surface: #141417;
-  --surface-2: #1c1c20;
-  --line: rgba(255, 255, 255, 0.07);
-  --line-strong: rgba(255, 255, 255, 0.13);
-  --text: #f3f1ec;
-  --muted: #a3a097;
-  --faint: #6c6961;
-  --accent: #d8b15f;
-  --accent-soft: rgba(216, 177, 95, 0.14);
-  --up: #56cf9b;
-  --down: #f0876a;
-  --up-soft: rgba(86, 207, 155, 0.12);
-  --down-soft: rgba(240, 135, 106, 0.12);
-  --shadow: 0 1px 0 rgba(255, 255, 255, 0.04), 0 24px 60px -34px rgba(0, 0, 0, 0.8);
-  --glow: rgba(216, 177, 95, 0.18);
-}
-
-[data-theme='light'] {
-  --bg: #f1eee7;
-  --surface: #ffffff;
-  --surface-2: #f9f7f1;
-  --line: rgba(20, 18, 14, 0.08);
-  --line-strong: rgba(20, 18, 14, 0.15);
-  --text: #171511;
-  --muted: #6c685f;
-  --faint: #a39e93;
-  --accent: #a9762b;
-  --accent-soft: rgba(169, 118, 43, 0.12);
-  --up: #138a5e;
-  --down: #cf5a34;
-  --up-soft: rgba(19, 138, 94, 0.1);
-  --down-soft: rgba(207, 90, 52, 0.1);
-  --shadow: 0 1px 0 rgba(255, 255, 255, 0.7), 0 26px 54px -36px rgba(40, 30, 10, 0.3);
-  --glow: rgba(169, 118, 43, 0.16);
-}
+/* Design tokens (:root / [data-theme='light'] / [data-accent='...']) are no longer defined here.
+   strata-topbar's constructor injects them into <head> at runtime, once, shared verbatim with
+   markets-admin - see strata-topbar/src/tokens.ts. The <strata-topbar> element in Layout.tsx
+   mounts before any other page content, so this resolves before first paint. */
 
 @keyframes fadeUp {
   from {
@@ -129,42 +96,6 @@ body {
   pointer-events: none;
   filter: blur(20px);
   z-index: 0;
-}
-
-.topbar {
-  position: sticky;
-  top: 0;
-  z-index: 40;
-  backdrop-filter: blur(18px);
-  background: color-mix(in srgb, var(--bg) 78%, transparent);
-  border-bottom: 1px solid var(--line);
-}
-
-.topbar-inner {
-  max-width: 1320px;
-  margin: 0 auto;
-  padding: 0 clamp(16px, 3vw, 32px);
-  height: 66px;
-  display: flex;
-  align-items: center;
-  gap: clamp(14px, 2.4vw, 32px);
-}
-
-.logo {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  cursor: pointer;
-  flex: none;
-  color: inherit;
-  text-decoration: none;
-}
-
-.logo-title {
-  font-family: 'Instrument Serif', serif;
-  font-size: 25px;
-  letter-spacing: 0.01em;
-  line-height: 1;
 }
 
 .search-wrap {
@@ -273,38 +204,6 @@ body {
 
 .icon-btn:hover {
   border-color: var(--line-strong);
-}
-
-.avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 40%, var(--text)));
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 600;
-  font-size: 14px;
-  color: var(--bg);
-  cursor: pointer;
-  flex: none;
-}
-
-.market-status {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 7px 12px;
-  border-radius: 10px;
-  background: var(--up-soft);
-  margin-right: 4px;
-}
-
-.market-status-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--up);
 }
 
 .shell {

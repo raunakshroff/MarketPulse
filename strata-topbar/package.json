@@ -1,0 +1,14 @@
+{
+  "name": "strata-topbar",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The Strata topbar (logo, theme toggle, accent picker, profile menu) as a single dependency-free custom element, so markets-ui and markets-admin render byte-identical chrome instead of two hand-maintained copies.",
+  "type": "module",
+  "scripts": {
+    "build": "vite build"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.2",
+    "vite": "^8.2.2"
+  }
+}
