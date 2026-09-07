@@ -77,7 +77,10 @@ admin:
         The React single-page app operators and users actually look at, served by nginx.
         Static only - it has no Actuator or Swagger of its own, so health is a plain page fetch.
       internal-url: ${ADMIN_MARKETS_UI_INTERNAL_URL:http://localhost:3000}
-      external-url: ${ADMIN_MARKETS_UI_EXTERNAL_URL:http://localhost:3000}
+      # Points at markets-gateway's root, not markets-ui's own direct port: this is the URL a
+      # browser follows, and going through the gateway is what keeps the address bar on one
+      # origin when navigating between this console and the dashboard (see markets-gateway).
+      external-url: ${ADMIN_MARKETS_UI_EXTERNAL_URL:http://localhost:8080}
       health-path: /
       links:
         - label: Open the app

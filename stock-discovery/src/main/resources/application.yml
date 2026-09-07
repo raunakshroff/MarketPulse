@@ -21,7 +21,7 @@ spring:
 
 app:
   cors:
-    allowed-origins: http://localhost:3000,http://localhost:5173
+    allowed-origins: http://localhost:3000,http://localhost:5173,http://localhost:8080
 
 springdoc:
   # Swagger UI at /swagger-ui.html, raw OpenAPI 3 JSON at /v3/api-docs.

@@ -45,7 +45,9 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://timescaledb:5432/marketpulse
       SPRING_DATASOURCE_USERNAME: marketpulse
       SPRING_DATASOURCE_PASSWORD: marketpulse
-      APP_CORS_ALLOWED_ORIGINS: http://localhost:3000
+      # Both markets-ui's direct port and markets-gateway's origin need to be allowed: the
+      # browser's Origin header reflects whichever one actually served the page.
+      APP_CORS_ALLOWED_ORIGINS: http://localhost:3000,http://localhost:8080
     depends_on:
       timescaledb:
         condition: service_healthy
@@ -77,9 +79,24 @@ services:
       ADMIN_STOCK_DISCOVERY_INTERNAL_URL: http://stock-discovery:8082
       ADMIN_STOCK_DISCOVERY_EXTERNAL_URL: http://localhost:8082
       ADMIN_MARKETS_UI_INTERNAL_URL: http://markets-ui:80
-      ADMIN_MARKETS_UI_EXTERNAL_URL: http://localhost:3000
+      ADMIN_MARKETS_UI_EXTERNAL_URL: http://localhost:8080
     # Deliberately no depends_on and no database: the console must be able to start and
     # report on the others precisely when they are broken.
+
+  markets-gateway:
+    build: ./markets-gateway
+    image: markets-gateway:latest
+    container_name: markets-gateway
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      TZ: Asia/Kolkata
+      GATEWAY_ADMIN_URL: http://markets-admin:8083
+      GATEWAY_UI_URL: http://markets-ui:80
+    depends_on:
+      - markets-ui
+      - markets-admin
 
 volumes:
   timescaledb-data:

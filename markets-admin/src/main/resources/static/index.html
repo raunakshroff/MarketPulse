@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<script src="/strata-topbar.js"></script>
+<script src="strata-topbar.js"></script>
 <style>
   /* ------------------------------------------------------------------
      Ported from markets-ui/src/theme.css - the Strata theme is the UI
@@ -347,12 +347,12 @@
 
 <strata-topbar
   id="topbar"
-  logo-href="http://localhost:3000"
+  logo-href="http://localhost:8080/"
   badge="admin console"
   status-label="checking…"
   status-variant="up"
   menu-label="Open Dashboard"
-  menu-href="http://localhost:3000"
+  menu-href="http://localhost:8080/"
   avatar-initial="A"
 ></strata-topbar>
 
@@ -468,7 +468,7 @@
     host.innerHTML = services.map(s => {
       const health = (s.health || 'UNKNOWN').toLowerCase();
       const links = (s.links || []).map(l => `
-        <a class="lnk" href="${esc(l.url)}" title="${esc(l.description)}">
+        <a class="lnk" href="${esc(l.url)}" title="${esc(l.description)}" target="_blank" rel="noopener noreferrer">
           <span class="l">${esc(l.label)}</span>
           <span class="d">${esc(l.description)}</span>
           <span class="a">→</span>
@@ -500,7 +500,7 @@
     button.disabled = true;
     stamp.textContent = 'probing…';
     try {
-      const r = await fetch('/api/v1/admin/services', { headers: { accept: 'application/json' } });
+      const r = await fetch('api/v1/admin/services', { headers: { accept: 'application/json' } });
       if (!r.ok) throw new Error('HTTP ' + r.status);
       const services = await r.json();
       // The topbar's markup ships with the documented http://localhost:3000 default; once the
